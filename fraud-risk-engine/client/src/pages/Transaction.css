@@ -1,0 +1,737 @@
+/* =========================================
+   TRANSACTION PAGE
+========================================= */
+
+.transaction-page {
+    min-height: calc(100vh - 72px);
+    padding: 45px 20px 70px;
+    position: relative;
+}
+
+
+/* =========================================
+   PAGE TITLE
+========================================= */
+
+.page-title {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto 35px;
+}
+
+.page-title a {
+    display: inline-flex;
+    align-items: center;
+
+    margin-bottom: 18px;
+
+    color: #67e8f9;
+    text-decoration: none;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    transition: 0.25s ease;
+}
+
+.page-title a:hover {
+    transform: translateX(-4px);
+    color: #93c5fd;
+}
+
+.page-title h1 {
+    margin: 0;
+
+    font-size: clamp(32px, 4vw, 48px);
+    line-height: 1.1;
+
+    letter-spacing: -1.5px;
+
+    background: linear-gradient(
+        90deg,
+        #f8fafc,
+        #93c5fd,
+        #67e8f9
+    );
+
+    -webkit-background-clip: text;
+    background-clip: text;
+
+    color: transparent;
+}
+
+.page-title p {
+    margin-top: 12px;
+
+    color: var(--text-secondary);
+
+    font-size: 15px;
+}
+
+
+/* =========================================
+   MAIN LAYOUT
+========================================= */
+
+.transaction-layout {
+    width: 100%;
+    max-width: 1200px;
+
+    margin: auto;
+
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+
+    gap: 25px;
+
+    align-items: stretch;
+}
+
+
+/* =========================================
+   FORM
+========================================= */
+
+.transaction-form {
+    padding: 30px;
+
+    border-radius: 22px;
+
+    background: linear-gradient(
+        145deg,
+        rgba(16, 31, 53, 0.96),
+        rgba(8, 19, 35, 0.94)
+    );
+
+    border: 1px solid var(--border);
+
+    box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.18);
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 20px;
+}
+
+.transaction-form > label {
+    display: flex;
+    flex-direction: column;
+
+    gap: 9px;
+
+    color: #dbeafe;
+
+    font-size: 12px;
+    font-weight: 700;
+}
+
+
+/* =========================================
+   INPUTS
+========================================= */
+
+.transaction-form input[type="number"] {
+    width: 100%;
+
+    box-sizing: border-box;
+
+    padding: 14px 15px;
+
+    border-radius: 11px;
+
+    outline: none;
+
+    color: #f8fafc;
+
+    background:
+        rgba(148, 163, 184, 0.05);
+
+    border:
+        1px solid rgba(148, 163, 184, 0.13);
+
+    font-size: 14px;
+
+    transition:
+        border 0.25s ease,
+        box-shadow 0.25s ease,
+        background 0.25s ease;
+}
+
+.transaction-form input[type="number"]::placeholder {
+    color: #64748b;
+}
+
+.transaction-form input[type="number"]:focus {
+    border-color:
+        rgba(34, 211, 238, 0.6);
+
+    background:
+        rgba(34, 211, 238, 0.035);
+
+    box-shadow:
+        0 0 0 4px rgba(34, 211, 238, 0.06);
+}
+
+
+/* =========================================
+   CHECKBOX
+========================================= */
+
+.checkbox-group {
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, 1fr);
+
+    gap: 15px;
+}
+
+.checkbox {
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+
+    padding: 15px;
+
+    border-radius: 12px;
+
+    cursor: pointer;
+
+    color: var(--text-secondary);
+
+    background:
+        rgba(148, 163, 184, 0.035);
+
+    border:
+        1px solid rgba(148, 163, 184, 0.1);
+
+    transition:
+        background 0.25s ease,
+        border 0.25s ease,
+        transform 0.25s ease;
+}
+
+.checkbox:hover {
+    transform: translateY(-2px);
+
+    background:
+        rgba(59, 130, 246, 0.06);
+
+    border-color:
+        rgba(59, 130, 246, 0.25);
+}
+
+.checkbox input {
+    width: 17px;
+    height: 17px;
+
+    accent-color: #22d3ee;
+
+    cursor: pointer;
+}
+
+.checkbox span {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+
+/* =========================================
+   FORM BUTTONS
+========================================= */
+
+.form-buttons {
+    display: flex;
+
+    gap: 12px;
+
+    margin-top: 5px;
+}
+
+.primary-btn,
+.secondary-btn {
+    padding: 14px 20px;
+
+    border-radius: 11px;
+
+    cursor: pointer;
+
+    font-size: 13px;
+    font-weight: 700;
+
+    transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease,
+        opacity 0.25s ease;
+}
+
+.primary-btn {
+    flex: 1;
+
+    border: none;
+
+    color: white;
+
+    background: linear-gradient(
+        135deg,
+        #2563eb,
+        #0891b2
+    );
+
+    box-shadow:
+        0 10px 25px rgba(37, 99, 235, 0.22);
+}
+
+.primary-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 15px 30px rgba(37, 99, 235, 0.35);
+}
+
+.primary-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.secondary-btn {
+    border:
+        1px solid rgba(148, 163, 184, 0.15);
+
+    color: var(--text-secondary);
+
+    background:
+        rgba(148, 163, 184, 0.05);
+}
+
+.secondary-btn:hover {
+    transform: translateY(-2px);
+
+    background:
+        rgba(148, 163, 184, 0.1);
+}
+
+
+/* =========================================
+   RESULT CARD
+========================================= */
+
+.result-card {
+    min-height: 500px;
+
+    padding: 30px;
+
+    border-radius: 22px;
+
+    background: linear-gradient(
+        145deg,
+        rgba(16, 31, 53, 0.96),
+        rgba(8, 19, 35, 0.94)
+    );
+
+    border:
+        1px solid var(--border);
+
+    box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.18);
+}
+
+
+/* =========================================
+   EMPTY RESULT
+========================================= */
+
+.result-empty {
+    height: 100%;
+
+    min-height: 440px;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    text-align: center;
+}
+
+.shield {
+    width: 90px;
+    height: 90px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin-bottom: 25px;
+
+    border-radius: 25px;
+
+    font-size: 42px;
+
+    background: linear-gradient(
+        145deg,
+        rgba(37, 99, 235, 0.2),
+        rgba(34, 211, 238, 0.08)
+    );
+
+    border:
+        1px solid rgba(96, 165, 250, 0.25);
+
+    box-shadow:
+        0 0 45px rgba(37, 99, 235, 0.14);
+
+    animation: shieldPulse 3s ease-in-out infinite;
+}
+
+.result-empty h2 {
+    margin: 0;
+
+    font-size: 24px;
+
+    color: #f8fafc;
+}
+
+.result-empty p {
+    max-width: 330px;
+
+    margin-top: 12px;
+
+    color: var(--text-muted);
+
+    font-size: 13px;
+
+    line-height: 1.7;
+}
+
+
+/* =========================================
+   RESULT TOP
+========================================= */
+
+.result-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    padding-bottom: 25px;
+
+    border-bottom:
+        1px solid rgba(148, 163, 184, 0.1);
+}
+
+.result-top > div > span {
+    color: var(--text-muted);
+
+    font-size: 10px;
+    font-weight: 800;
+
+    letter-spacing: 1.5px;
+}
+
+.result-top h2 {
+    margin: 8px 0 0;
+
+    font-size: 60px;
+
+    line-height: 1;
+
+    color: #f8fafc;
+}
+
+.result-top h2 small {
+    font-size: 18px;
+
+    color: var(--text-muted);
+}
+
+
+/* =========================================
+   RISK BADGES
+========================================= */
+
+.large-badge {
+    padding: 9px 15px;
+
+    border-radius: 30px;
+
+    font-size: 10px;
+    font-weight: 800;
+
+    letter-spacing: 1px;
+}
+
+.large-badge.low {
+    color: #86efac;
+
+    background:
+        rgba(34, 197, 94, 0.1);
+
+    border:
+        1px solid rgba(34, 197, 94, 0.2);
+}
+
+.large-badge.medium {
+    color: #fcd34d;
+
+    background:
+        rgba(245, 158, 11, 0.1);
+
+    border:
+        1px solid rgba(245, 158, 11, 0.2);
+}
+
+.large-badge.high {
+    color: #fca5a5;
+
+    background:
+        rgba(239, 68, 68, 0.1);
+
+    border:
+        1px solid rgba(239, 68, 68, 0.2);
+}
+
+
+/* =========================================
+   RECOMMENDED ACTION
+========================================= */
+
+.action-box {
+    margin-top: 25px;
+
+    padding: 18px;
+
+    border-radius: 14px;
+
+    background:
+        rgba(59, 130, 246, 0.06);
+
+    border:
+        1px solid rgba(59, 130, 246, 0.13);
+}
+
+.action-box span {
+    display: block;
+
+    margin-bottom: 7px;
+
+    color: var(--text-muted);
+
+    font-size: 10px;
+    font-weight: 700;
+
+    letter-spacing: 1px;
+}
+
+.action-box strong {
+    color: #dbeafe;
+
+    font-size: 14px;
+}
+
+.action-box.low {
+    background:
+        rgba(34, 197, 94, 0.06);
+
+    border-color:
+        rgba(34, 197, 94, 0.15);
+}
+
+.action-box.medium {
+    background:
+        rgba(245, 158, 11, 0.06);
+
+    border-color:
+        rgba(245, 158, 11, 0.15);
+}
+
+.action-box.high {
+    background:
+        rgba(239, 68, 68, 0.07);
+
+    border-color:
+        rgba(239, 68, 68, 0.18);
+}
+
+
+/* =========================================
+   REASONS
+========================================= */
+
+.reasons {
+    margin-top: 28px;
+}
+
+.reasons h3 {
+    margin-bottom: 15px;
+
+    color: #f8fafc;
+
+    font-size: 16px;
+}
+
+.reason {
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+
+    margin-bottom: 10px;
+
+    padding: 12px;
+
+    border-radius: 10px;
+
+    color: var(--text-secondary);
+
+    font-size: 12px;
+
+    background:
+        rgba(148, 163, 184, 0.035);
+
+    border:
+        1px solid rgba(148, 163, 184, 0.07);
+}
+
+.reason span {
+    width: 20px;
+    height: 20px;
+
+    flex-shrink: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    color: #fcd34d;
+
+    background:
+        rgba(245, 158, 11, 0.12);
+
+    font-size: 12px;
+    font-weight: 800;
+}
+
+
+/* =========================================
+   ML INFO
+========================================= */
+
+.ml-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-top: 25px;
+
+    padding-top: 20px;
+
+    border-top:
+        1px solid rgba(148, 163, 184, 0.1);
+}
+
+.ml-info span {
+    color: var(--text-muted);
+
+    font-size: 11px;
+}
+
+.ml-info strong {
+    color: #67e8f9;
+
+    font-size: 20px;
+}
+
+
+/* =========================================
+   ANIMATION
+========================================= */
+
+@keyframes shieldPulse {
+
+    0%,
+    100% {
+        transform: translateY(0) scale(1);
+    }
+
+    50% {
+        transform: translateY(-7px) scale(1.04);
+    }
+
+}
+
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (max-width: 900px) {
+
+    .transaction-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .result-card {
+        min-height: auto;
+    }
+
+}
+
+
+@media (max-width: 600px) {
+
+    .transaction-page {
+        padding: 30px 15px 50px;
+    }
+
+    .page-title {
+        margin-bottom: 25px;
+    }
+
+    .page-title h1 {
+        font-size: 32px;
+    }
+
+    .transaction-form,
+    .result-card {
+        padding: 20px;
+        border-radius: 17px;
+    }
+
+    .checkbox-group {
+        grid-template-columns: 1fr;
+    }
+
+    .form-buttons {
+        flex-direction: column;
+    }
+
+    .primary-btn,
+    .secondary-btn {
+        width: 100%;
+    }
+
+    .result-top h2 {
+        font-size: 48px;
+    }
+
+}
+
+
+@media (max-width: 400px) {
+
+    .page-title h1 {
+        font-size: 28px;
+    }
+
+    .result-top {
+        flex-direction: column;
+    }
+
+}
