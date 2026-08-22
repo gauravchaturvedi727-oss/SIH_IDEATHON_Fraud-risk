@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
+import axios from "axios";
 
 import Navbar from "../components/Navbar";
-import api from "../services/api";
 
 import "./VoiceAnalyzer.css";
 
@@ -128,7 +128,6 @@ function VoiceAnalyzer() {
                 );
 
 
-                // Stop microphone access
                 stream.getTracks().forEach(
                     (track) => track.stop()
                 );
@@ -197,9 +196,7 @@ function VoiceAnalyzer() {
         try {
 
             setLoading(true);
-
             setError("");
-
             setResult(null);
 
 
@@ -207,18 +204,27 @@ function VoiceAnalyzer() {
                 new FormData();
 
 
-            // Backend field name
             formData.append(
                 "audio",
                 audio
             );
 
 
-            // Using central API service
+            // DIRECT CALL TO FLASK ML SERVICE
             const response =
-                await api.post(
-                    "/voice/analyze",
-                    formData
+                await axios.post(
+
+                    "http://localhost:8000/analyze-voice",
+
+                    formData,
+
+                    {
+                        headers: {
+                            "Content-Type":
+                                "multipart/form-data"
+                        }
+                    }
+
                 );
 
 
@@ -228,9 +234,28 @@ function VoiceAnalyzer() {
             );
 
 
-            setResult(
-                response.data
-            );
+            // NORMALIZE RESPONSE
+            setResult({
+
+                transcript:
+                    response.data.transcript || "",
+
+                riskScore:
+                    response.data.riskScore ?? 0,
+
+                riskLevel:
+                    response.data.riskLevel || "LOW",
+
+                recommendedAction:
+                    response.data.recommendedAction ||
+                    "Remain cautious and avoid sharing sensitive information.",
+
+                reasons:
+                    response.data.detectedIndicators ||
+                    response.data.reasons ||
+                    []
+
+            });
 
         }
         catch (error) {
@@ -248,8 +273,11 @@ function VoiceAnalyzer() {
 
 
             setError(
+
                 error.response?.data?.message ||
-                "Failed to analyze voice recording"
+
+                "Failed to analyze voice recording. Please try again."
+
             );
 
         }
@@ -285,13 +313,9 @@ function VoiceAnalyzer() {
 
 
         setAudio(null);
-
         setResult(null);
-
         setError("");
-
         setRecordedAudioUrl(null);
-
         setRecording(false);
 
     };
@@ -466,6 +490,8 @@ function VoiceAnalyzer() {
 
                                     <button
 
+                                        type="button"
+
                                         className="record-btn"
 
                                         onClick={startRecording}
@@ -481,6 +507,8 @@ function VoiceAnalyzer() {
                                 ) : (
 
                                     <button
+
+                                        type="button"
 
                                         className="stop-record-btn"
 
@@ -599,6 +627,8 @@ function VoiceAnalyzer() {
 
                             <button
 
+                                type="button"
+
                                 className="voice-primary-btn"
 
                                 onClick={analyzeVoice}
@@ -639,6 +669,8 @@ function VoiceAnalyzer() {
 
 
                             <button
+
+                                type="button"
 
                                 className="voice-secondary-btn"
 
@@ -710,7 +742,9 @@ function VoiceAnalyzer() {
 
                         <section
                             className={`voice-result ${
-                                result.riskLevel?.toLowerCase() || "low"
+                                String(
+                                    result.riskLevel || "LOW"
+                                ).toLowerCase()
                             }`}
                         >
 
@@ -738,8 +772,9 @@ function VoiceAnalyzer() {
 
                                 <div
                                     className={`voice-risk-badge ${
-                                        result.riskLevel?.toLowerCase() ||
-                                        "low"
+                                        String(
+                                            result.riskLevel || "LOW"
+                                        ).toLowerCase()
                                     }`}
                                 >
 

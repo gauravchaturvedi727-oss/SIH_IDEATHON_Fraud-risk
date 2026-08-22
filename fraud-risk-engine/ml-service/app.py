@@ -10,36 +10,6 @@ import whisper
 
 
 # ==========================================
-# FFMPEG PATH FIX FOR WINDOWS
-# ==========================================
-
-FFMPEG_PATH = (
-    r"C:\Users\gaura\AppData\Local\Microsoft\WinGet\Packages"
-    r"\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe"
-    r"\ffmpeg-9.0-full_build\bin"
-)
-
-# Add FFmpeg bin folder to PATH
-os.environ["PATH"] = (
-    FFMPEG_PATH
-    + os.pathsep
-    + os.environ.get("PATH", "")
-)
-
-
-# ==========================================
-# CHECK FFMPEG
-# ==========================================
-
-print("Checking FFmpeg...")
-
-print(
-    "FFmpeg found:",
-    shutil.which("ffmpeg")
-)
-
-
-# ==========================================
 # APP SETUP
 # ==========================================
 
@@ -79,9 +49,7 @@ os.makedirs(
 
 print("Loading fraud risk model...")
 
-model = joblib.load(
-    MODEL_PATH
-)
+model = joblib.load(MODEL_PATH)
 
 print("Fraud risk model loaded successfully")
 
@@ -101,26 +69,28 @@ FEATURES = [
 
 
 # ==========================================
-# LOAD WHISPER MODEL
+# LOAD WHISPER MODEL - TINY FOR DEPLOYMENT
 # ==========================================
 
-print("Loading Whisper model...")
+print("Loading Whisper tiny model...")
 
 whisper_model = whisper.load_model(
-    "base"
+    "tiny"
 )
 
-print("Whisper model loaded successfully")
+print("Whisper tiny model loaded successfully")
 
 
 # ==========================================
-# HOME
+# HOME / HEALTH CHECK
 # ==========================================
 
 @app.get("/")
 def home():
 
     return jsonify({
+
+        "success": True,
 
         "message":
             "Fraud Risk ML API is running",
@@ -135,7 +105,10 @@ def home():
 
         },
 
-        "ffmpeg":
+        "whisperModel":
+            "tiny",
+
+        "ffmpegAvailable":
             shutil.which("ffmpeg") is not None
 
     })
@@ -156,6 +129,8 @@ def predict():
 
             return jsonify({
 
+                "success": False,
+
                 "message":
                     "Request data is required"
 
@@ -166,23 +141,22 @@ def predict():
             data.get("amount", 0)
         )
 
+
         new_device = int(
-            bool(
-                data.get(
-                    "newDevice",
-                    False
-                )
-            )
+            str(
+                data.get("newDevice", False)
+            ).lower()
+            in ["true", "1", "yes"]
         )
 
+
         new_location = int(
-            bool(
-                data.get(
-                    "newLocation",
-                    False
-                )
-            )
+            str(
+                data.get("newLocation", False)
+            ).lower()
+            in ["true", "1", "yes"]
         )
+
 
         rapid_transactions = int(
             data.get(
@@ -191,12 +165,14 @@ def predict():
             )
         )
 
+
         failed_logins = int(
             data.get(
                 "failedLogins",
                 0
             )
         )
+
 
         otp_requests = int(
             data.get(
@@ -207,7 +183,7 @@ def predict():
 
 
         # ==================================
-        # CREATE INPUT DATAFRAME
+        # CREATE INPUT DATA
         # ==================================
 
         input_data = pd.DataFrame(
@@ -276,11 +252,13 @@ def predict():
                 "Unusually high transaction amount"
             )
 
+
         if new_device:
 
             reasons.append(
                 "Payment made from a new device"
             )
+
 
         if new_location:
 
@@ -288,11 +266,13 @@ def predict():
                 "Transaction from an unusual location"
             )
 
+
         if rapid_transactions >= 3:
 
             reasons.append(
                 "Multiple rapid transactions detected"
             )
+
 
         if failed_logins >= 3:
 
@@ -300,11 +280,13 @@ def predict():
                 "Multiple failed login attempts"
             )
 
+
         if otp_requests >= 2:
 
             reasons.append(
                 "Repeated OTP requests detected"
             )
+
 
         if not reasons:
 
@@ -314,6 +296,8 @@ def predict():
 
 
         return jsonify({
+
+            "success": True,
 
             "riskScore":
                 risk_score,
@@ -340,10 +324,13 @@ def predict():
 
         print(
             "PREDICTION ERROR:",
-            str(error)
+            repr(error)
         )
 
+
         return jsonify({
+
+            "success": False,
 
             "message":
                 str(error)
@@ -370,19 +357,23 @@ def analyze_voice():
 
             return jsonify({
 
+                "success": False,
+
                 "message":
-                    "FFmpeg was not found by Python. Check the configured FFMPEG_PATH."
+                    "FFmpeg is not available on the server."
 
             }), 500
 
 
         # ==================================
-        # CHECK AUDIO FILE
+        # CHECK AUDIO
         # ==================================
 
         if "audio" not in request.files:
 
             return jsonify({
+
+                "success": False,
 
                 "message":
                     "Audio file is required"
@@ -397,6 +388,8 @@ def analyze_voice():
 
             return jsonify({
 
+                "success": False,
+
                 "message":
                     "No audio file selected"
 
@@ -404,17 +397,22 @@ def analyze_voice():
 
 
         # ==================================
-        # CREATE UNIQUE FILE NAME
+        # FILE EXTENSION
         # ==================================
 
         original_extension = os.path.splitext(
             audio_file.filename
-        )[1]
+        )[1].lower()
+
 
         if not original_extension:
 
             original_extension = ".webm"
 
+
+        # ==================================
+        # UNIQUE FILE
+        # ==================================
 
         unique_filename = (
             f"{uuid.uuid4()}"
@@ -444,14 +442,16 @@ def analyze_voice():
 
 
         # ==================================
-        # WHISPER TRANSCRIPTION
+        # TRANSCRIBE USING WHISPER TINY
         # ==================================
 
         result = whisper_model.transcribe(
 
             audio_path,
 
-            fp16=False
+            fp16=False,
+
+            verbose=False
 
         )
 
@@ -469,24 +469,24 @@ def analyze_voice():
 
 
         # ==================================
-        # EMPTY AUDIO / NO SPEECH
+        # NO SPEECH
         # ==================================
 
         if not transcript:
 
             return jsonify({
 
-                "transcript":
-                    "",
+                "success": True,
 
-                "riskScore":
-                    0,
+                "transcript": "",
 
-                "riskLevel":
-                    "LOW",
+                "riskScore": 0,
 
-                "detectedIndicators":
-                    [],
+                "riskLevel": "LOW",
+
+                "reasons": [],
+
+                "detectedIndicators": [],
 
                 "recommendedAction":
                     "Could not detect clear speech. Please record again."
@@ -544,12 +544,15 @@ def analyze_voice():
 
 
         # ==================================
-        # CALCULATE RISK SCORE
+        # RISK SCORE
         # ==================================
 
         risk_score = min(
+
             len(detected_indicators) * 15,
+
             100
+
         )
 
 
@@ -562,26 +565,51 @@ def analyze_voice():
             risk_level = "HIGH"
 
             recommended_action = (
-                "Do not share OTP, banking details or "
-                "personal information. Verify the caller "
-                "independently."
+                "Do not share OTP, banking details, "
+                "passwords or personal information. "
+                "Verify the caller independently."
             )
+
 
         elif risk_score >= 30:
 
             risk_level = "MEDIUM"
 
             recommended_action = (
-                "Be cautious. Verify the caller before "
-                "sharing any sensitive information."
+                "Be cautious. Verify the caller through "
+                "an official source before sharing any "
+                "sensitive information."
             )
+
 
         else:
 
             risk_level = "LOW"
 
             recommended_action = (
-                "No major scam indicators were detected."
+                "No major scam indicators were detected. "
+                "Continue to remain cautious."
+            )
+
+
+        # ==================================
+        # REASONS
+        # ==================================
+
+        reasons = []
+
+
+        for indicator in detected_indicators:
+
+            reasons.append(
+                f"Suspicious keyword detected: {indicator}"
+            )
+
+
+        if not reasons:
+
+            reasons.append(
+                "No strong scam indicators detected"
             )
 
 
@@ -591,6 +619,8 @@ def analyze_voice():
 
         return jsonify({
 
+            "success": True,
+
             "transcript":
                 transcript,
 
@@ -599,6 +629,9 @@ def analyze_voice():
 
             "riskLevel":
                 risk_level,
+
+            "reasons":
+                reasons,
 
             "detectedIndicators":
                 detected_indicators,
@@ -616,7 +649,10 @@ def analyze_voice():
             repr(error)
         )
 
+
         return jsonify({
+
+            "success": False,
 
             "message":
                 str(error)
@@ -627,7 +663,7 @@ def analyze_voice():
     finally:
 
         # ==================================
-        # DELETE TEMP AUDIO FILE
+        # DELETE TEMP FILE
         # ==================================
 
         if (
@@ -660,12 +696,20 @@ def analyze_voice():
 
 if __name__ == "__main__":
 
+    port = int(
+        os.environ.get(
+            "PORT",
+            8000
+        )
+    )
+
+
     app.run(
 
         host="0.0.0.0",
 
-        port=8000,
+        port=port,
 
-        debug=True
+        debug=False
 
     )
