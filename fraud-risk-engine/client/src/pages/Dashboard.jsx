@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import api from "../services/api";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import Navbar from "../components/Navbar";
 
@@ -22,11 +24,6 @@ function Dashboard() {
         useState("");
 
     const navigate = useNavigate();
-
-
-    // ==================================
-    // FETCH DASHBOARD DATA
-    // ==================================
 
     const fetchDashboard = async () => {
 
@@ -70,6 +67,93 @@ function Dashboard() {
         finally {
 
             setLoading(false);
+
+        }
+
+    };
+
+
+    const clearAllActivity = async () => {
+
+        const confirmDelete =
+            window.confirm(
+                "Are you sure you want to delete all security activity?"
+            );
+
+
+        if (!confirmDelete) {
+
+            return;
+
+        }
+
+
+        try {
+
+            await api.delete("/dashboard/clear-activity");
+
+
+            setDashboardData(
+                (previousData) => ({
+
+                    ...previousData,
+
+                    stats: {
+
+                        securityScore: 100,
+
+                        totalScans: 0,
+
+                        totalTransactions: 0,
+
+                        totalPhishing: 0,
+
+                        totalVoice: 0,
+
+                        highRisk: 0,
+
+                        mediumRisk: 0,
+
+                        lowRisk: 0,
+
+                        detectedThreats: 0,
+
+                        detectionRate: 0
+
+                    },
+
+                    recentActivity: [],
+
+                    lastUpdated:
+                        new Date().toISOString()
+
+                })
+            );
+
+            await fetchDashboard();
+
+
+            toast.success(
+                "All security activity deleted successfully"
+            );
+
+        }
+        catch (error) {
+
+            console.error(
+                "CLEAR ACTIVITY ERROR:",
+                error.response?.data ||
+                error.message
+            );
+
+
+            toast.error(
+
+                error.response?.data?.message ||
+
+                "Failed to delete security activity"
+
+            );
 
         }
 
@@ -1290,11 +1374,24 @@ function Dashboard() {
                             </div>
 
 
-                            <div className="activity-live">
+                            <div className="activity-header-actions">
 
-                                <span></span>
+                                <button
+                                    className="clear-activity-btn"
+                                    onClick={clearAllActivity}
+                                    disabled={recentActivities.length === 0}
+                                >
+                                    🗑 Clear All
+                                </button>
 
-                                Monitoring Live
+
+                                <div className="activity-live">
+
+                                    <span></span>
+
+                                    Monitoring Live
+
+                                </div>
 
                             </div>
 

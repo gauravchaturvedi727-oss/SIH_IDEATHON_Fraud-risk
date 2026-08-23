@@ -1,7 +1,3 @@
-/* =========================================
-   DASHBOARD PAGE
-========================================= */
-
 .dashboard-page {
     position: relative;
     min-height: calc(100vh - 72px);
@@ -35,10 +31,6 @@
     );
 }
 
-
-/* =========================================
-   BACKGROUND GLOWS
-========================================= */
 
 .dashboard-glow {
     position: absolute;
@@ -86,10 +78,6 @@
 }
 
 
-/* =========================================
-   MAIN CONTAINER
-========================================= */
-
 .dashboard-container {
     position: relative;
     z-index: 1;
@@ -100,10 +88,6 @@
     margin: auto;
 }
 
-
-/* =========================================
-   HERO
-========================================= */
 
 .dashboard-hero {
     position: relative;
@@ -167,10 +151,6 @@
         );
 }
 
-
-/* =========================================
-   HERO CONTENT
-========================================= */
 
 .hero-content {
     position: relative;
@@ -242,10 +222,6 @@
 }
 
 
-/* =========================================
-   HERO TEXT
-========================================= */
-
 .dashboard-hero h1 {
     max-width: 650px;
 
@@ -289,10 +265,6 @@
     margin-bottom: 30px;
 }
 
-
-/* =========================================
-   HERO BUTTONS
-========================================= */
 
 .hero-actions {
     display: flex;
@@ -358,10 +330,6 @@
     color: var(--text);
 }
 
-
-/* =========================================
-   SECURITY CORE
-========================================= */
 
 .security-core-wrapper {
     position: relative;
@@ -1786,11 +1754,6 @@
     line-height: 1.6;
 }
 
-
-/* =========================================
-   STAT CARD COLORS
-========================================= */
-
 .stat-card.red .stat-icon {
     background: rgba(255, 80, 80, 0.12);
 }
@@ -1803,10 +1766,6 @@
     background: rgba(60, 220, 140, 0.12);
 }
 
-
-/* =========================================
-   MOBILE
-========================================= */
 
 @media (max-width: 768px) {
 
@@ -1891,5 +1850,57 @@
     .empty-dashboard-activity {
         padding: 35px 12px;
     }
+
+}
+
+
+.activity-header-actions {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 14px;
+
+}
+
+
+.clear-activity-btn {
+
+    border: 1px solid rgba(255, 90, 90, 0.35);
+
+    background: rgba(255, 70, 70, 0.08);
+
+    color: #ff7373;
+
+    padding: 9px 15px;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+
+    font-size: 13px;
+
+    font-weight: 600;
+
+    transition: 0.3s;
+
+}
+
+
+.clear-activity-btn:hover:not(:disabled) {
+
+    background: rgba(255, 70, 70, 0.18);
+
+    transform: translateY(-2px);
+
+}
+
+
+.clear-activity-btn:disabled {
+
+    opacity: 0.45;
+
+    cursor: not-allowed;
 
 }

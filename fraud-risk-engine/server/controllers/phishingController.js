@@ -1,16 +1,21 @@
 const Phishing = require("../models/Phishing");
 
-
 const analyzePhishing = async (req, res) => {
 
     try {
 
+        console.log(
+            "PHISHING REQUEST BODY:",
+            req.body
+        );
+
+        console.log(
+            "LOGGED-IN USER:",
+            req.user
+        );
+
+
         const { text } = req.body;
-
-
-        // ==========================================
-        // VALIDATE TEXT
-        // ==========================================
 
         if (
             !text ||
@@ -28,15 +33,22 @@ const analyzePhishing = async (req, res) => {
 
         }
 
+        if (!req.user || !req.user.id) {
 
-        const lowerText = text
-            .toLowerCase()
-            .trim();
+            return res.status(401).json({
+
+                success: false,
+
+                message:
+                    "User authentication failed. Please login again."
+
+            });
+
+        }
 
 
-        // ==========================================
-        // SUSPICIOUS PATTERNS
-        // ==========================================
+        const lowerText =
+            text.toLowerCase().trim();
 
         const suspiciousPatterns = [
 
@@ -48,7 +60,8 @@ const analyzePhishing = async (req, res) => {
                     "tell me otp"
                 ],
 
-                reason: "Request for OTP detected",
+                reason:
+                    "Request for OTP detected",
 
                 score: 25
             },
@@ -60,7 +73,8 @@ const analyzePhishing = async (req, res) => {
                     "card cvv"
                 ],
 
-                reason: "Request for CVV detected",
+                reason:
+                    "Request for CVV detected",
 
                 score: 20
             },
@@ -73,7 +87,8 @@ const analyzePhishing = async (req, res) => {
                     "tell me your pin"
                 ],
 
-                reason: "Request for PIN detected",
+                reason:
+                    "Request for PIN detected",
 
                 score: 25
             },
@@ -85,7 +100,8 @@ const analyzePhishing = async (req, res) => {
                     "login password"
                 ],
 
-                reason: "Request for password detected",
+                reason:
+                    "Request for password detected",
 
                 score: 20
             },
@@ -235,17 +251,15 @@ const analyzePhishing = async (req, res) => {
 
         ];
 
-
-        // ==========================================
-        // ANALYZE MESSAGE
-        // ==========================================
-
         let riskScore = 0;
 
         const reasons = [];
 
 
-        for (const pattern of suspiciousPatterns) {
+        for (
+            const pattern
+            of suspiciousPatterns
+        ) {
 
             const foundKeyword =
                 pattern.keywords.find(
@@ -256,7 +270,8 @@ const analyzePhishing = async (req, res) => {
 
             if (foundKeyword) {
 
-                riskScore += pattern.score;
+                riskScore +=
+                    pattern.score;
 
                 reasons.push(
                     pattern.reason
@@ -266,20 +281,10 @@ const analyzePhishing = async (req, res) => {
 
         }
 
-
-        // ==========================================
-        // LIMIT SCORE
-        // ==========================================
-
         riskScore = Math.min(
             riskScore,
             100
         );
-
-
-        // ==========================================
-        // RISK LEVEL
-        // ==========================================
 
         let riskLevel;
 
@@ -311,11 +316,6 @@ const analyzePhishing = async (req, res) => {
 
         }
 
-
-        // ==========================================
-        // SAFE MESSAGE
-        // ==========================================
-
         if (reasons.length === 0) {
 
             reasons.push(
@@ -325,40 +325,47 @@ const analyzePhishing = async (req, res) => {
         }
 
 
-        // ==========================================
-        // SAVE RESULT TO MONGODB
-        // IMPORTANT: SAVE LOGGED-IN USER ID
-        // ==========================================
+        let prediction;
+
+
+        if (riskLevel === "HIGH") {
+
+            prediction =
+                "Phishing / Scam Detected";
+
+        }
+        else if (riskLevel === "MEDIUM") {
+
+            prediction =
+                "Suspicious Message";
+
+        }
+        else {
+
+            prediction =
+                "Safe / Low Risk";
+
+        }
 
         const savedPhishing =
-        await Phishing.create({
+            await Phishing.create({
 
-            user:
-                req.user.id,
+                user:
+                    req.user.id,
 
-            message:
-                text.trim(),
+                message:
+                    text.trim(),
 
-            riskScore,
+                riskScore,
 
-            riskLevel,
+                riskLevel,
 
-            prediction:
-                riskLevel === "HIGH"
-                    ? "Phishing / Scam Detected"
-                    : riskLevel === "MEDIUM"
-                    ? "Suspicious Message"
-                    : "Safe / Low Risk",
+                prediction,
 
-            confidence:
-                riskScore
+                confidence:
+                    riskScore
 
-        });
-
-
-        // ==========================================
-        // RESPONSE
-        // ==========================================
+            });
 
         return res.status(200).json({
 
@@ -394,7 +401,10 @@ const analyzePhishing = async (req, res) => {
             success: false,
 
             message:
-                "Message analysis failed"
+                "Message analysis failed",
+
+            error:
+                error.message
 
         });
 
@@ -408,3 +418,4 @@ module.exports = {
     analyzePhishing
 
 };
+

@@ -3,11 +3,6 @@ const axios = require("axios");
 const Transaction =
     require("../models/Transaction");
 
-
-// ==========================================
-// CREATE TRANSACTION
-// ==========================================
-
 const createTransaction = async (
     req,
     res
@@ -23,11 +18,6 @@ const createTransaction = async (
             failedLogins,
             otpRequests
         } = req.body;
-
-
-        // ==================================
-        // SEND DATA TO ML SERVICE
-        // ==================================
 
         const mlResponse =
             await axios.post(
@@ -88,10 +78,6 @@ const createTransaction = async (
 
             });
 
-
-        // ==================================
-        // RESPONSE
-        // ==================================
 
         res.status(201).json({
 
@@ -155,10 +141,6 @@ const createTransaction = async (
 };
 
 
-// ==========================================
-// GET ALL
-// ==========================================
-
 const getTransactions = async (
     req,
     res
@@ -192,10 +174,6 @@ const getTransactions = async (
     }
 };
 
-
-// ==========================================
-// GET SINGLE
-// ==========================================
 
 const getTransactionById = async (
     req,
@@ -243,11 +221,6 @@ const getTransactionById = async (
     }
 };
 
-
-// ==========================================
-// UPDATE
-// ==========================================
-
 const updateTransaction = async (
     req,
     res
@@ -266,10 +239,6 @@ const updateTransaction = async (
 
         } = req.body;
 
-
-        // ==================================
-        // RE-CALCULATE WITH ML
-        // ==================================
 
         const mlResponse =
             await axios.post(
@@ -300,10 +269,6 @@ const updateTransaction = async (
 
         } = mlResponse.data;
 
-
-        // ==================================
-        // UPDATE
-        // ==================================
 
         const transaction =
             await Transaction.findOneAndUpdate(
@@ -381,11 +346,6 @@ const updateTransaction = async (
 
     }
 };
-
-
-// ==========================================
-// DELETE
-// ==========================================
 
 const deleteTransaction = async (
     req,

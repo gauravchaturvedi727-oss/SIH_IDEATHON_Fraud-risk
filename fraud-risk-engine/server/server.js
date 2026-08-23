@@ -6,10 +6,6 @@ const cors = require("cors");
 const connectDB = require("./config/db");
 
 
-// =====================================
-// ROUTES
-// =====================================
-
 const authRoutes =
     require("./routes/authRoutes");
 
@@ -26,32 +22,19 @@ const dashboardRoutes =
     require("./routes/dashboardRoutes");
 
 
-// =====================================
-// APP
-// =====================================
+const notificationRoutes =
+    require("./routes/notificationRoutes");
 
 const app = express();
 
 
-// =====================================
-// DATABASE
-// =====================================
-
 connectDB();
 
-
-// =====================================
-// MIDDLEWARE
-// =====================================
 
 app.use(cors());
 
 app.use(express.json());
 
-
-// =====================================
-// API ROUTES
-// =====================================
 
 app.use(
     "/api/auth",
@@ -78,10 +61,10 @@ app.use(
     dashboardRoutes
 );
 
-
-// =====================================
-// TEST ROUTE
-// =====================================
+app.use(
+    "/api/notifications",
+    notificationRoutes
+);
 
 app.get(
     "/",
@@ -94,11 +77,6 @@ app.get(
 
     }
 );
-
-
-// =====================================
-// ERROR HANDLER
-// =====================================
 
 app.use(
     (err, req, res, next) => {
@@ -120,11 +98,6 @@ app.use(
 
     }
 );
-
-
-// =====================================
-// SERVER
-// =====================================
 
 const PORT =
     process.env.PORT || 5000;

@@ -25,8 +25,6 @@ function App() {
 
             <Routes>
 
-                {/* AUTH */}
-
                 <Route
                     path="/login"
                     element={<Login />}
@@ -37,9 +35,6 @@ function App() {
                     element={<Register />}
                 />
 
-
-                {/* DASHBOARD */}
-
                 <Route
                     path="/"
                     element={
@@ -48,9 +43,6 @@ function App() {
                         </ProtectedRoute>
                     }
                 />
-
-
-                {/* TRANSACTION */}
 
                 <Route
                     path="/transaction"
@@ -70,9 +62,6 @@ function App() {
                     }
                 />
 
-
-                {/* PHISHING */}
-
                 <Route
                     path="/phishing-analyzer"
                     element={
@@ -81,9 +70,6 @@ function App() {
                         </ProtectedRoute>
                     }
                 />
-
-
-                {/* VOICE */}
 
                 <Route
                     path="/voice-analyzer"

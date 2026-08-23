@@ -22,11 +22,6 @@ function Register() {
 
     const [loading, setLoading] = useState(false);
 
-
-    // ==========================
-    // HANDLE CHANGE
-    // ==========================
-
     const handleChange = (e) => {
 
         const { name, value } = e.target;
@@ -38,17 +33,11 @@ function Register() {
 
     };
 
-
-    // ==========================
-    // REGISTER
-    // ==========================
-
     const handleSubmit = async (e) => {
 
         e.preventDefault();
 
 
-        // Password validation
         if (form.password !== form.confirmPassword) {
 
             toast.error(
@@ -97,8 +86,6 @@ function Register() {
                 "Account created successfully!"
             );
 
-
-            // After successful registration → Login page
             navigate("/login", {
                 replace: true
             });
@@ -132,9 +119,6 @@ function Register() {
 
         <div className="register-page">
 
-
-            {/* BACKGROUND */}
-
             <div className="register-grid"></div>
 
             <div className="register-glow register-glow-one"></div>
@@ -144,9 +128,6 @@ function Register() {
 
 
             <div className="register-container">
-
-
-                {/* LEFT SIDE */}
 
                 <section className="register-info">
 
@@ -267,10 +248,6 @@ function Register() {
 
                 </section>
 
-
-
-                {/* RIGHT SIDE - REGISTER FORM */}
-
                 <section className="register-card">
 
 
@@ -297,9 +274,6 @@ function Register() {
 
                     <form onSubmit={handleSubmit}>
 
-
-                        {/* NAME */}
-
                         <div className="register-input-group">
 
                             <label>
@@ -323,10 +297,6 @@ function Register() {
                             </div>
 
                         </div>
-
-
-
-                        {/* EMAIL */}
 
                         <div className="register-input-group">
 
@@ -352,10 +322,6 @@ function Register() {
 
                         </div>
 
-
-
-                        {/* PASSWORD */}
-
                         <div className="register-input-group">
 
                             <label>
@@ -380,10 +346,6 @@ function Register() {
 
                         </div>
 
-
-
-                        {/* CONFIRM PASSWORD */}
-
                         <div className="register-input-group">
 
                             <label>
@@ -407,10 +369,6 @@ function Register() {
                             </div>
 
                         </div>
-
-
-
-                        {/* BUTTON */}
 
                         <button
                             type="submit"
@@ -438,10 +396,6 @@ function Register() {
 
 
                     </form>
-
-
-
-                    {/* LOGIN LINK */}
 
                     <div className="register-bottom">
 

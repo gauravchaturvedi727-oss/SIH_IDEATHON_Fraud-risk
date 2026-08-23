@@ -6,21 +6,11 @@ import uuid
 import shutil
 import joblib
 import pandas as pd
-import whisper
 
-
-# ==========================================
-# APP SETUP
-# ==========================================
 
 app = Flask(__name__)
 
 CORS(app)
-
-
-# ==========================================
-# PATH CONFIGURATION
-# ==========================================
 
 BASE_DIR = os.path.dirname(
     os.path.abspath(__file__)
@@ -42,21 +32,12 @@ os.makedirs(
     exist_ok=True
 )
 
-
-# ==========================================
-# LOAD FRAUD RISK MODEL
-# ==========================================
-
 print("Loading fraud risk model...")
 
 model = joblib.load(MODEL_PATH)
 
 print("Fraud risk model loaded successfully")
 
-
-# ==========================================
-# FRAUD MODEL FEATURES
-# ==========================================
 
 FEATURES = [
     "amount",
@@ -67,23 +48,26 @@ FEATURES = [
     "otpRequests"
 ]
 
-
-# ==========================================
-# LOAD WHISPER MODEL - TINY FOR DEPLOYMENT
-# ==========================================
-
-print("Loading Whisper tiny model...")
-
-whisper_model = whisper.load_model(
-    "tiny"
-)
-
-print("Whisper tiny model loaded successfully")
+whisper_model = None
 
 
-# ==========================================
-# HOME / HEALTH CHECK
-# ==========================================
+def get_whisper_model():
+
+    global whisper_model
+
+    if whisper_model is None:
+
+        print("Loading Whisper tiny model...")
+
+        import whisper
+
+        whisper_model = whisper.load_model(
+            "tiny"
+        )
+
+        print("Whisper model loaded successfully")
+
+    return whisper_model
 
 @app.get("/")
 def home():
@@ -101,22 +85,18 @@ def home():
                 "ACTIVE",
 
             "voiceAnalysis":
-                "ACTIVE"
+                "READY"
 
         },
 
-        "whisperModel":
-            "tiny",
+        "whisperLoaded":
+            whisper_model is not None,
 
         "ffmpegAvailable":
             shutil.which("ffmpeg") is not None
 
     })
 
-
-# ==========================================
-# TRANSACTION FRAUD PREDICTION
-# ==========================================
 
 @app.post("/predict")
 def predict():
@@ -165,7 +145,6 @@ def predict():
             )
         )
 
-
         failed_logins = int(
             data.get(
                 "failedLogins",
@@ -173,18 +152,12 @@ def predict():
             )
         )
 
-
         otp_requests = int(
             data.get(
                 "otpRequests",
                 0
             )
         )
-
-
-        # ==================================
-        # CREATE INPUT DATA
-        # ==================================
 
         input_data = pd.DataFrame(
 
@@ -201,15 +174,12 @@ def predict():
 
         )
 
-
-        # ==================================
-        # ML PREDICTION
-        # ==================================
-
         probability = float(
+
             model.predict_proba(
                 input_data
             )[0][1]
+
         )
 
 
@@ -218,30 +188,29 @@ def predict():
             2
         )
 
-
-        # ==================================
-        # RISK LEVEL
-        # ==================================
-
         if risk_score >= 75:
 
             risk_level = "HIGH"
-            recommended_action = "PAUSE & VERIFY"
+
+            recommended_action = (
+                "PAUSE & VERIFY"
+            )
 
         elif risk_score >= 45:
 
             risk_level = "MEDIUM"
-            recommended_action = "CONFIRM"
+
+            recommended_action = (
+                "CONFIRM"
+            )
 
         else:
 
             risk_level = "LOW"
-            recommended_action = "ALLOW"
 
-
-        # ==================================
-        # EXPLANATION
-        # ==================================
+            recommended_action = (
+                "ALLOW"
+            )
 
         reasons = []
 
@@ -337,21 +306,12 @@ def predict():
 
         }), 500
 
-
-# ==========================================
-# VOICE SCAM ANALYSIS
-# ==========================================
-
 @app.post("/analyze-voice")
 def analyze_voice():
 
     audio_path = None
 
     try:
-
-        # ==================================
-        # CHECK FFMPEG
-        # ==================================
 
         if not shutil.which("ffmpeg"):
 
@@ -363,11 +323,6 @@ def analyze_voice():
                     "FFmpeg is not available on the server."
 
             }), 500
-
-
-        # ==================================
-        # CHECK AUDIO
-        # ==================================
 
         if "audio" not in request.files:
 
@@ -396,10 +351,6 @@ def analyze_voice():
             }), 400
 
 
-        # ==================================
-        # FILE EXTENSION
-        # ==================================
-
         original_extension = os.path.splitext(
             audio_file.filename
         )[1].lower()
@@ -408,11 +359,6 @@ def analyze_voice():
         if not original_extension:
 
             original_extension = ".webm"
-
-
-        # ==================================
-        # UNIQUE FILE
-        # ==================================
 
         unique_filename = (
             f"{uuid.uuid4()}"
@@ -425,11 +371,6 @@ def analyze_voice():
             unique_filename
         )
 
-
-        # ==================================
-        # SAVE AUDIO
-        # ==================================
-
         audio_file.save(
             audio_path
         )
@@ -441,17 +382,13 @@ def analyze_voice():
         )
 
 
-        # ==================================
-        # TRANSCRIBE USING WHISPER TINY
-        # ==================================
+        voice_model = get_whisper_model()
 
-        result = whisper_model.transcribe(
+        result = voice_model.transcribe(
 
             audio_path,
 
-            fp16=False,
-
-            verbose=False
+            fp16=False
 
         )
 
@@ -466,11 +403,6 @@ def analyze_voice():
             "TRANSCRIPT:",
             transcript
         )
-
-
-        # ==================================
-        # NO SPEECH
-        # ==================================
 
         if not transcript:
 
@@ -492,11 +424,6 @@ def analyze_voice():
                     "Could not detect clear speech. Please record again."
 
             })
-
-
-        # ==================================
-        # SCAM KEYWORDS
-        # ==================================
 
         suspicious_keywords = [
 
@@ -542,11 +469,6 @@ def analyze_voice():
                     keyword
                 )
 
-
-        # ==================================
-        # RISK SCORE
-        # ==================================
-
         risk_score = min(
 
             len(detected_indicators) * 15,
@@ -555,19 +477,16 @@ def analyze_voice():
 
         )
 
-
-        # ==================================
-        # RISK LEVEL
-        # ==================================
-
         if risk_score >= 60:
 
             risk_level = "HIGH"
 
             recommended_action = (
+
                 "Do not share OTP, banking details, "
                 "passwords or personal information. "
                 "Verify the caller independently."
+
             )
 
 
@@ -576,9 +495,11 @@ def analyze_voice():
             risk_level = "MEDIUM"
 
             recommended_action = (
+
                 "Be cautious. Verify the caller through "
                 "an official source before sharing any "
                 "sensitive information."
+
             )
 
 
@@ -587,14 +508,11 @@ def analyze_voice():
             risk_level = "LOW"
 
             recommended_action = (
+
                 "No major scam indicators were detected. "
                 "Continue to remain cautious."
+
             )
-
-
-        # ==================================
-        # REASONS
-        # ==================================
 
         reasons = []
 
@@ -611,11 +529,6 @@ def analyze_voice():
             reasons.append(
                 "No strong scam indicators detected"
             )
-
-
-        # ==================================
-        # FINAL RESPONSE
-        # ==================================
 
         return jsonify({
 
@@ -661,11 +574,6 @@ def analyze_voice():
 
 
     finally:
-
-        # ==================================
-        # DELETE TEMP FILE
-        # ==================================
-
         if (
             audio_path
             and
@@ -688,11 +596,6 @@ def analyze_voice():
                     "FILE DELETE ERROR:",
                     str(delete_error)
                 )
-
-
-# ==========================================
-# START SERVER
-# ==========================================
 
 if __name__ == "__main__":
 

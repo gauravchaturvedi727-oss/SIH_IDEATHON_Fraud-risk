@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+
 import api from "../services/api";
+
 import "./NotificationCenter.css";
+
 
 function NotificationCenter() {
 
@@ -15,18 +18,15 @@ function NotificationCenter() {
     const [loading, setLoading] =
         useState(false);
 
-    const notificationRef = useRef(null);
-
-
-    // ==================================
-    // GET NOTIFICATIONS
-    // ==================================
+    const notificationRef =
+        useRef(null);
 
     const fetchNotifications = async () => {
 
         try {
 
             setLoading(true);
+
 
             const response =
                 await api.get("/notifications");
@@ -46,7 +46,8 @@ function NotificationCenter() {
 
             console.error(
                 "NOTIFICATION ERROR:",
-                error
+                error.response?.data ||
+                error.message
             );
 
         }
@@ -59,37 +60,46 @@ function NotificationCenter() {
     };
 
 
-    // ==================================
-    // LOAD ON PAGE OPEN
-    // ==================================
-
     useEffect(() => {
 
         fetchNotifications();
 
     }, []);
 
+    useEffect(() => {
 
-    // ==================================
-    // CLOSE WHEN CLICKING OUTSIDE
-    // ==================================
+        const interval = setInterval(() => {
+
+            fetchNotifications();
+
+        }, 10000);
+
+
+        return () => {
+
+            clearInterval(interval);
+
+        };
+
+    }, []);
 
     useEffect(() => {
 
-        const handleClickOutside = (event) => {
+        const handleClickOutside =
+            (event) => {
 
-            if (
-                notificationRef.current &&
-                !notificationRef.current.contains(
-                    event.target
-                )
-            ) {
+                if (
+                    notificationRef.current &&
+                    !notificationRef.current.contains(
+                        event.target
+                    )
+                ) {
 
-                setOpen(false);
+                    setOpen(false);
 
-            }
+                }
 
-        };
+            };
 
 
         document.addEventListener(
@@ -109,11 +119,6 @@ function NotificationCenter() {
 
     }, []);
 
-
-    // ==================================
-    // MARK ALL AS READ
-    // ==================================
-
     const markAllAsRead = async () => {
 
         try {
@@ -123,11 +128,18 @@ function NotificationCenter() {
             );
 
 
-            setNotifications((previous) =>
-                previous.map((notification) => ({
-                    ...notification,
-                    read: true
-                }))
+            setNotifications(
+                (previous) =>
+
+                    previous.map(
+                        (notification) => ({
+
+                            ...notification,
+
+                            read: true
+
+                        })
+                    )
             );
 
 
@@ -137,8 +149,9 @@ function NotificationCenter() {
         catch (error) {
 
             console.error(
-                "MARK READ ERROR:",
-                error
+                "MARK ALL READ ERROR:",
+                error.response?.data ||
+                error.message
             );
 
         }
@@ -146,14 +159,65 @@ function NotificationCenter() {
     };
 
 
-    // ==================================
-    // RISK CLASS
-    // ==================================
+    const markOneAsRead = async (id) => {
+
+        try {
+
+            await api.put(
+                `/notifications/${id}/read`
+            );
+
+
+            setNotifications(
+                (previous) =>
+
+                    previous.map(
+                        (notification) =>
+
+                            notification.id === id
+
+                                ? {
+
+                                    ...notification,
+
+                                    read: true
+
+                                }
+
+                                : notification
+                    )
+            );
+
+
+            setUnreadCount(
+                (previous) =>
+
+                    previous > 0
+
+                        ? previous - 1
+
+                        : 0
+            );
+
+        }
+        catch (error) {
+
+            console.error(
+                "MARK ONE READ ERROR:",
+                error.response?.data ||
+                error.message
+            );
+
+        }
+
+    };
 
     const getRiskClass = (riskLevel) => {
 
         const risk =
-            riskLevel?.toLowerCase() || "low";
+            String(
+                riskLevel || "LOW"
+            ).toLowerCase();
 
 
         if (risk.includes("high")) {
@@ -174,11 +238,6 @@ function NotificationCenter() {
 
     };
 
-
-    // ==================================
-    // TIME FORMAT
-    // ==================================
-
     const getTimeAgo = (date) => {
 
         if (!date) {
@@ -190,7 +249,12 @@ function NotificationCenter() {
 
         const seconds =
             Math.floor(
-                (new Date() - new Date(date)) / 1000
+
+                (
+                    new Date() -
+                    new Date(date)
+                ) / 1000
+
             );
 
 
@@ -202,7 +266,9 @@ function NotificationCenter() {
 
 
         const minutes =
-            Math.floor(seconds / 60);
+            Math.floor(
+                seconds / 60
+            );
 
 
         if (minutes < 60) {
@@ -213,7 +279,9 @@ function NotificationCenter() {
 
 
         const hours =
-            Math.floor(minutes / 60);
+            Math.floor(
+                minutes / 60
+            );
 
 
         if (hours < 24) {
@@ -224,10 +292,28 @@ function NotificationCenter() {
 
 
         const days =
-            Math.floor(hours / 24);
+            Math.floor(
+                hours / 24
+            );
 
 
-        return `${days} day ago`;
+        return `${days} day${
+            days > 1
+                ? "s"
+                : ""
+        } ago`;
+
+    };
+
+
+    const handleBellClick = () => {
+
+        setOpen(
+            (previous) => !previous
+        );
+
+
+        fetchNotifications();
 
     };
 
@@ -239,27 +325,16 @@ function NotificationCenter() {
             ref={notificationRef}
         >
 
-
-            {/* ================= BELL ================= */}
-
             <button
                 className="notification-bell"
-                onClick={() => {
-
-                    setOpen(!open);
-
-
-                    if (!open) {
-
-                        fetchNotifications();
-
-                    }
-
-                }}
+                onClick={handleBellClick}
+                aria-label="Notifications"
             >
 
                 <span className="bell-icon">
+
                     🔔
+
                 </span>
 
 
@@ -267,9 +342,11 @@ function NotificationCenter() {
 
                     <span className="notification-count">
 
-                        {unreadCount > 9
-                            ? "9+"
-                            : unreadCount}
+                        {
+                            unreadCount > 9
+                                ? "9+"
+                                : unreadCount
+                        }
 
                     </span>
 
@@ -277,16 +354,9 @@ function NotificationCenter() {
 
             </button>
 
-
-
-            {/* ================= DROPDOWN ================= */}
-
             {open && (
 
                 <div className="notification-dropdown">
-
-
-                    {/* HEADER */}
 
                     <div className="notification-header">
 
@@ -295,6 +365,7 @@ function NotificationCenter() {
                             <span>
                                 SECURITY ALERTS
                             </span>
+
 
                             <h3>
                                 Notifications
@@ -319,9 +390,6 @@ function NotificationCenter() {
                     </div>
 
 
-
-                    {/* LIST */}
-
                     <div className="notification-list">
 
 
@@ -341,9 +409,11 @@ function NotificationCenter() {
                                     🛡️
                                 </div>
 
+
                                 <strong>
                                     No notifications
                                 </strong>
+
 
                                 <p>
                                     Your security alerts will
@@ -358,6 +428,7 @@ function NotificationCenter() {
                                 (notification) => (
 
                                     <div
+
                                         className={
                                             `notification-item ${
                                                 getRiskClass(
@@ -369,11 +440,27 @@ function NotificationCenter() {
                                                     : ""
                                             }`
                                         }
+
                                         key={notification.id}
+
+                                        onClick={() => {
+
+                                            if (
+                                                !notification.read
+                                            ) {
+
+                                                markOneAsRead(
+                                                    notification.id
+                                                );
+
+                                            }
+
+                                        }}
+
                                     >
 
-
                                         <div
+
                                             className={
                                                 `notification-risk-icon ${
                                                     getRiskClass(
@@ -381,23 +468,34 @@ function NotificationCenter() {
                                                     )
                                                 }`
                                             }
+
                                         >
 
-                                            {notification.icon}
+                                            {
+                                                notification.icon ||
+                                                "🛡️"
+                                            }
 
                                         </div>
 
-
-                                        <div className="notification-content">
+                                        <div
+                                            className="notification-content"
+                                        >
 
                                             <p>
-                                                {notification.message}
+
+                                                {
+                                                    notification.message ||
+                                                    "Security activity detected"
+                                                }
+
                                             </p>
 
 
                                             <div>
 
                                                 <span
+
                                                     className={
                                                         `notification-risk ${
                                                             getRiskClass(
@@ -405,18 +503,24 @@ function NotificationCenter() {
                                                             )
                                                         }`
                                                     }
+
                                                 >
 
-                                                    {notification.riskLevel}
+                                                    {
+                                                        notification.riskLevel ||
+                                                        "LOW"
+                                                    }
 
                                                 </span>
 
 
                                                 <small>
 
-                                                    {getTimeAgo(
-                                                        notification.createdAt
-                                                    )}
+                                                    {
+                                                        getTimeAgo(
+                                                            notification.createdAt
+                                                        )
+                                                    }
 
                                                 </small>
 
@@ -427,7 +531,9 @@ function NotificationCenter() {
 
                                         {!notification.read && (
 
-                                            <span className="unread-dot"></span>
+                                            <span
+                                                className="unread-dot"
+                                            ></span>
 
                                         )}
 
@@ -440,9 +546,6 @@ function NotificationCenter() {
 
                     </div>
 
-
-
-                    {/* FOOTER */}
 
                     <div className="notification-footer">
 

@@ -12,11 +12,6 @@ function Navbar() {
 
     const navigate = useNavigate();
 
-
-    // ================================
-    // LOGOUT
-    // ================================
-
     const logout = () => {
 
         localStorage.removeItem("token");
@@ -26,11 +21,6 @@ function Navbar() {
         navigate("/login");
 
     };
-
-
-    // ================================
-    // CLOSE MOBILE MENU
-    // ================================
 
     const closeMenu = () => {
 
@@ -45,8 +35,6 @@ function Navbar() {
 
             <div className="navbar-container">
 
-
-                {/* ================= LOGO ================= */}
 
                 <NavLink
                     to="/"
@@ -65,19 +53,11 @@ function Navbar() {
 
                 </NavLink>
 
-
-                {/* ================= RIGHT SIDE ================= */}
-
                 <div className="navbar-right">
 
 
-                    {/* NOTIFICATION BELL */}
-
                     <NotificationCenter />
-
-
-                    {/* MOBILE MENU BUTTON */}
-
+                    
                     <button
                         className="menu-toggle"
                         onClick={() =>
@@ -91,9 +71,6 @@ function Navbar() {
                     </button>
 
                 </div>
-
-
-                {/* ================= NAV LINKS ================= */}
 
                 <div
                     className={
@@ -160,8 +137,6 @@ function Navbar() {
                         Voice Analyzer
                     </NavLink>
 
-
-                    {/* LOGOUT */}
 
                     <button
                         className="logout-btn"

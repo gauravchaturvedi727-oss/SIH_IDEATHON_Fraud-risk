@@ -2,11 +2,6 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-
-// ==========================================
-// REGISTER
-// ==========================================
-
 const register = async (req, res) => {
 
     try {
@@ -83,11 +78,6 @@ const register = async (req, res) => {
 
 };
 
-
-// ==========================================
-// LOGIN
-// ==========================================
-
 const login = async (req, res) => {
 
     try {
@@ -129,11 +119,6 @@ const login = async (req, res) => {
             });
 
         }
-
-
-        // ==========================================
-        // GENERATE JWT TOKEN
-        // ==========================================
 
         const token = jwt.sign(
 

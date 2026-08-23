@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import axios from "axios";
+import api from "../services/api";
 
 import Navbar from "../components/Navbar";
 
@@ -13,26 +13,26 @@ function VoiceAnalyzer() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [recording, setRecording] = useState(false);
-    const [recordedAudioUrl, setRecordedAudioUrl] = useState(null);
+    const [recordedAudioUrl, setRecordedAudioUrl] =
+        useState(null);
 
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
 
 
-    // ==================================
-    // FILE SELECT
-    // ==================================
-
     const handleFileChange = (event) => {
 
-        const selectedFile = event.target.files[0];
+        const selectedFile =
+            event.target.files[0];
 
         if (!selectedFile) return;
 
 
         if (recordedAudioUrl) {
 
-            URL.revokeObjectURL(recordedAudioUrl);
+            URL.revokeObjectURL(
+                recordedAudioUrl
+            );
 
         }
 
@@ -43,11 +43,6 @@ function VoiceAnalyzer() {
         setRecordedAudioUrl(null);
 
     };
-
-
-    // ==================================
-    // START RECORDING
-    // ==================================
 
     const startRecording = async () => {
 
@@ -74,17 +69,18 @@ function VoiceAnalyzer() {
             audioChunksRef.current = [];
 
 
-            mediaRecorder.ondataavailable = (event) => {
+            mediaRecorder.ondataavailable =
+                (event) => {
 
-                if (event.data.size > 0) {
+                    if (event.data.size > 0) {
 
-                    audioChunksRef.current.push(
-                        event.data
-                    );
+                        audioChunksRef.current.push(
+                            event.data
+                        );
 
-                }
+                    }
 
-            };
+                };
 
 
             mediaRecorder.onstop = () => {
@@ -118,7 +114,9 @@ function VoiceAnalyzer() {
 
 
                 const audioUrl =
-                    URL.createObjectURL(audioBlob);
+                    URL.createObjectURL(
+                        audioBlob
+                    );
 
 
                 setAudio(recordedFile);
@@ -147,6 +145,7 @@ function VoiceAnalyzer() {
                 error
             );
 
+
             setError(
                 "Microphone access was denied or unavailable."
             );
@@ -156,15 +155,12 @@ function VoiceAnalyzer() {
     };
 
 
-    // ==================================
-    // STOP RECORDING
-    // ==================================
-
     const stopRecording = () => {
 
         if (
             mediaRecorderRef.current &&
-            mediaRecorderRef.current.state !== "inactive"
+            mediaRecorderRef.current.state !==
+            "inactive"
         ) {
 
             mediaRecorderRef.current.stop();
@@ -174,11 +170,6 @@ function VoiceAnalyzer() {
         }
 
     };
-
-
-    // ==================================
-    // ANALYZE VOICE
-    // ==================================
 
     const analyzeVoice = async () => {
 
@@ -209,21 +200,18 @@ function VoiceAnalyzer() {
                 audio
             );
 
+            console.log(
+                "SENDING AUDIO TO BACKEND:",
+                audio.name
+            );
 
-            // DIRECT CALL TO FLASK ML SERVICE
+
             const response =
-                await axios.post(
+                await api.post(
 
-                    "http://localhost:8000/analyze-voice",
+                    "/voice/analyze",
 
-                    formData,
-
-                    {
-                        headers: {
-                            "Content-Type":
-                                "multipart/form-data"
-                        }
-                    }
+                    formData
 
                 );
 
@@ -233,26 +221,28 @@ function VoiceAnalyzer() {
                 response.data
             );
 
-
-            // NORMALIZE RESPONSE
             setResult({
 
                 transcript:
                     response.data.transcript || "",
 
+
                 riskScore:
                     response.data.riskScore ?? 0,
 
+
                 riskLevel:
                     response.data.riskLevel || "LOW",
+
 
                 recommendedAction:
                     response.data.recommendedAction ||
                     "Remain cautious and avoid sharing sensitive information.",
 
+
                 reasons:
-                    response.data.detectedIndicators ||
                     response.data.reasons ||
+                    response.data.detectedIndicators ||
                     []
 
             });
@@ -288,11 +278,6 @@ function VoiceAnalyzer() {
         }
 
     };
-
-
-    // ==================================
-    // RESET
-    // ==================================
 
     const resetAnalyzer = () => {
 
@@ -340,8 +325,6 @@ function VoiceAnalyzer() {
                 <div className="voice-container">
 
 
-                    {/* HEADER */}
-
                     <section className="voice-header">
 
                         <div className="voice-label">
@@ -364,16 +347,14 @@ function VoiceAnalyzer() {
 
                         <p>
 
-                            Upload or record a suspicious call. Our AI converts
-                            voice to text and analyzes the conversation for
-                            possible scam and fraud indicators.
+                            Upload or record a suspicious call.
+                            Our AI converts voice to text and analyzes
+                            the conversation for possible scam and fraud
+                            indicators.
 
                         </p>
 
                     </section>
-
-
-                    {/* UPLOAD / RECORD */}
 
                     <section className="voice-upload-card">
 
@@ -398,8 +379,8 @@ function VoiceAnalyzer() {
 
                                 <p>
 
-                                    Select an audio file or record a suspicious
-                                    conversation directly.
+                                    Select an audio file or record
+                                    a suspicious conversation directly.
 
                                 </p>
 
@@ -420,8 +401,6 @@ function VoiceAnalyzer() {
                         <div className="voice-input-grid">
 
 
-                            {/* FILE UPLOAD */}
-
                             <label className="audio-upload-box">
 
                                 <input
@@ -432,7 +411,10 @@ function VoiceAnalyzer() {
 
                                     onChange={handleFileChange}
 
-                                    disabled={recording || loading}
+                                    disabled={
+                                        recording ||
+                                        loading
+                                    }
 
                                 />
 
@@ -459,8 +441,6 @@ function VoiceAnalyzer() {
 
                             </label>
 
-
-                            {/* RECORD */}
 
                             <div className="record-box">
 
@@ -494,7 +474,9 @@ function VoiceAnalyzer() {
 
                                         className="record-btn"
 
-                                        onClick={startRecording}
+                                        onClick={
+                                            startRecording
+                                        }
 
                                         disabled={loading}
 
@@ -512,7 +494,9 @@ function VoiceAnalyzer() {
 
                                         className="stop-record-btn"
 
-                                        onClick={stopRecording}
+                                        onClick={
+                                            stopRecording
+                                        }
 
                                     >
 
@@ -527,8 +511,6 @@ function VoiceAnalyzer() {
                         </div>
 
 
-                        {/* RECORDING STATUS */}
-
                         {recording && (
 
                             <div className="recording-status">
@@ -541,8 +523,6 @@ function VoiceAnalyzer() {
 
                         )}
 
-
-                        {/* SELECTED FILE */}
 
                         {audio && (
 
@@ -577,8 +557,6 @@ function VoiceAnalyzer() {
                         )}
 
 
-                        {/* AUDIO PREVIEW */}
-
                         {recordedAudioUrl && (
 
                             <div className="audio-preview">
@@ -605,8 +583,6 @@ function VoiceAnalyzer() {
                         )}
 
 
-                        {/* ERROR */}
-
                         {error && (
 
                             <div className="error-message">
@@ -619,8 +595,6 @@ function VoiceAnalyzer() {
 
                         )}
 
-
-                        {/* ACTION BUTTONS */}
 
                         <div className="voice-buttons">
 
@@ -688,13 +662,9 @@ function VoiceAnalyzer() {
 
                     </section>
 
-
-                    {/* LOADING */}
-
                     {loading && (
 
                         <section className="voice-loading">
-
 
                             <div className="voice-scanner">
 
@@ -735,9 +705,6 @@ function VoiceAnalyzer() {
 
                     )}
 
-
-                    {/* RESULT */}
-
                     {result && !loading && (
 
                         <section
@@ -748,9 +715,7 @@ function VoiceAnalyzer() {
                             }`}
                         >
 
-
                             <div className="voice-result-header">
-
 
                                 <div>
 
@@ -785,10 +750,7 @@ function VoiceAnalyzer() {
                             </div>
 
 
-                            {/* RISK CARDS */}
-
                             <div className="voice-risk-grid">
-
 
                                 <div className="voice-result-card score-card">
 
@@ -839,7 +801,8 @@ function VoiceAnalyzer() {
 
                                     <p>
 
-                                        {result.recommendedAction ||
+                                        {
+                                            result.recommendedAction ||
                                             "Remain cautious and avoid sharing sensitive information."
                                         }
 
@@ -850,13 +813,9 @@ function VoiceAnalyzer() {
                             </div>
 
 
-                            {/* TRANSCRIPT */}
-
                             <div className="transcript-box">
 
-
                                 <div className="result-box-heading">
-
 
                                     <div className="result-box-icon">
 
@@ -887,7 +846,8 @@ function VoiceAnalyzer() {
 
                                 <p>
 
-                                    {result.transcript ||
+                                    {
+                                        result.transcript ||
                                         "No speech detected in the audio."
                                     }
 
@@ -895,14 +855,9 @@ function VoiceAnalyzer() {
 
                             </div>
 
-
-                            {/* REASONS */}
-
                             <div className="voice-reasons">
 
-
                                 <div className="reasons-header">
-
 
                                     <div>
 
@@ -924,60 +879,71 @@ function VoiceAnalyzer() {
 
                                     <span className="reasons-count">
 
-                                        {result.reasons?.length || 0} SIGNALS
+                                        {
+                                            result.reasons?.length || 0
+                                        } SIGNALS
 
                                     </span>
 
                                 </div>
 
 
-                                {result.reasons &&
-                                result.reasons.length > 0 ? (
+                                {
+                                    result.reasons &&
+                                    result.reasons.length > 0
+                                        ? (
 
-                                    <div className="voice-reasons-list">
+                                            <div className="voice-reasons-list">
 
-                                        {result.reasons.map(
-                                            (reason, index) => (
+                                                {
+                                                    result.reasons.map(
+                                                        (reason, index) => (
 
-                                                <div
-                                                    className="voice-reason-item"
-                                                    key={index}
-                                                >
+                                                            <div
+                                                                className="voice-reason-item"
+                                                                key={index}
+                                                            >
 
-                                                    <span>
+                                                                <span>
 
-                                                        {String(index + 1)
-                                                            .padStart(
-                                                                2,
-                                                                "0"
-                                                            )}
+                                                                    {
+                                                                        String(
+                                                                            index + 1
+                                                                        ).padStart(
+                                                                            2,
+                                                                            "0"
+                                                                        )
+                                                                    }
 
-                                                    </span>
+                                                                </span>
 
 
-                                                    <p>
+                                                                <p>
 
-                                                        {reason}
+                                                                    {reason}
 
-                                                    </p>
+                                                                </p>
 
-                                                </div>
+                                                            </div>
 
-                                            )
-                                        )}
+                                                        )
+                                                    )
+                                                }
 
-                                    </div>
+                                            </div>
 
-                                ) : (
+                                        )
+                                        : (
 
-                                    <div className="no-voice-reasons">
+                                            <div className="no-voice-reasons">
 
-                                        ✓ No major suspicious indicators
-                                        were detected.
+                                                ✓ No major suspicious indicators
+                                                were detected.
 
-                                    </div>
+                                            </div>
 
-                                )}
+                                        )
+                                }
 
                             </div>
 

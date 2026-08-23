@@ -10,11 +10,6 @@ function PhishingAnalyzer() {
     const [error, setError] = useState("");
     const [result, setResult] = useState(null);
 
-
-    // =========================================
-    // ANALYZE MESSAGE
-    // =========================================
-
     const handleAnalyze = async () => {
 
         if (!message.trim()) {
@@ -34,12 +29,6 @@ function PhishingAnalyzer() {
             setError("");
 
             setResult(null);
-
-
-            // =====================================
-            // API CALL
-            // api.js automatically sends JWT token
-            // =====================================
 
             const response = await api.post(
 
@@ -89,10 +78,6 @@ function PhishingAnalyzer() {
     };
 
 
-    // =========================================
-    // RESET
-    // =========================================
-
     const handleReset = () => {
 
         setMessage("");
@@ -102,11 +87,6 @@ function PhishingAnalyzer() {
         setError("");
 
     };
-
-
-    // =========================================
-    // GET RISK CLASS
-    // =========================================
 
     const getRiskClass = () => {
 
@@ -145,10 +125,6 @@ function PhishingAnalyzer() {
     };
 
 
-    // =========================================
-    // RESULT DATA
-    // =========================================
-
     const riskLevel =
         result?.riskLevel || "LOW";
 
@@ -169,11 +145,6 @@ function PhishingAnalyzer() {
         result?.recommendedAction ||
         "Continue to remain cautious with unknown messages.";
 
-
-    // =========================================
-    // JSX
-    // =========================================
-
     return (
 
         <>
@@ -192,11 +163,6 @@ function PhishingAnalyzer() {
 
 
                 <div className="phishing-container">
-
-
-                    {/* =========================================
-                        HERO
-                    ========================================= */}
 
                     <section className="phishing-hero">
 
@@ -229,11 +195,6 @@ function PhishingAnalyzer() {
 
 
                     </section>
-
-
-                    {/* =========================================
-                        ANALYZER CARD
-                    ========================================= */}
 
                     <section className="analyzer-card">
 
@@ -290,11 +251,6 @@ function PhishingAnalyzer() {
 
 
                         </div>
-
-
-                        {/* =========================================
-                            TEXTAREA
-                        ========================================= */}
 
                         <div className="message-area">
 
@@ -375,11 +331,6 @@ function PhishingAnalyzer() {
 
                         </div>
 
-
-                        {/* =========================================
-                            ERROR
-                        ========================================= */}
-
                         {error && (
 
                             <div className="phishing-error">
@@ -402,11 +353,6 @@ function PhishingAnalyzer() {
                             </div>
 
                         )}
-
-
-                        {/* =========================================
-                            BUTTONS
-                        ========================================= */}
 
                         <div className="phishing-actions">
 
@@ -482,11 +428,6 @@ function PhishingAnalyzer() {
 
                     </section>
 
-
-                    {/* =========================================
-                        LOADING
-                    ========================================= */}
-
                     {loading && (
 
                         <section className="analysis-loading">
@@ -530,11 +471,6 @@ function PhishingAnalyzer() {
 
                     )}
 
-
-                    {/* =========================================
-                        RESULT
-                    ========================================= */}
-
                     {result && !loading && (
 
                         <section
@@ -577,9 +513,6 @@ function PhishingAnalyzer() {
 
 
                             </div>
-
-
-                            {/* SCORE */}
 
                             <div className="score-panel">
 
@@ -662,11 +595,6 @@ function PhishingAnalyzer() {
 
 
                             </div>
-
-
-                            {/* =========================================
-                                REASONS
-                            ========================================= */}
 
                             <div className="reasons-panel">
 
@@ -785,11 +713,6 @@ function PhishingAnalyzer() {
 
 
                             </div>
-
-
-                            {/* =========================================
-                                RECOMMENDATION
-                            ========================================= */}
 
                             <div
                                 className={`recommendation ${getRiskClass()}`}

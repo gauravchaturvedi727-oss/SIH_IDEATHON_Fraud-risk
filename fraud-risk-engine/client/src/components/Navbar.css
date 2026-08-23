@@ -37,10 +37,6 @@
 }
 
 
-/* =========================
-   LOGO
-========================= */
-
 .navbar-logo {
     display: flex;
     align-items: center;
@@ -84,10 +80,6 @@
         0 0 20px rgba(37, 99, 235, 0.16);
 }
 
-
-/* =========================
-   LINKS
-========================= */
 
 .navbar-links {
     display: flex;
@@ -170,10 +162,6 @@
 }
 
 
-/* =========================
-   LOGOUT
-========================= */
-
 .logout-btn {
     display: flex;
     align-items: center;
@@ -218,9 +206,6 @@
 }
 
 
-/* =========================
-   MOBILE MENU BUTTON
-========================= */
 
 .menu-toggle {
     display: none;
@@ -243,10 +228,6 @@
     cursor: pointer;
 }
 
-
-/* =========================
-   RESPONSIVE
-========================= */
 
 @media (max-width: 950px) {
 

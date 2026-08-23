@@ -6,17 +6,27 @@ const VoiceAnalysis =
     require("../models/VoiceAnalysis");
 
 
-// ==========================================
-// ANALYZE VOICE
-// ==========================================
-
 const analyzeVoice = async (req, res) => {
 
     try {
 
-        // ==================================
-        // CHECK AUDIO FILE
-        // ==================================
+        console.log(
+            "VOICE REQUEST USER:",
+            req.user
+        );
+
+        if (!req.user || !req.user.id) {
+
+            return res.status(401).json({
+
+                success: false,
+
+                message:
+                    "User authentication failed. Please login again."
+
+            });
+
+        }
 
         if (!req.file) {
 
@@ -30,10 +40,19 @@ const analyzeVoice = async (req, res) => {
 
         }
 
+        if (!process.env.ML_SERVICE_URL) {
 
-        // ==================================
-        // CREATE FORM DATA
-        // ==================================
+            return res.status(500).json({
+
+                success: false,
+
+                message:
+                    "ML_SERVICE_URL is not configured"
+
+            });
+
+        }
+
 
         const formData = new FormData();
 
@@ -58,15 +77,20 @@ const analyzeVoice = async (req, res) => {
 
         );
 
+        const mlUrl =
+            `${process.env.ML_SERVICE_URL}/analyze-voice`;
 
-        // ==================================
-        // SEND AUDIO TO FLASK ML SERVER
-        // ==================================
+
+        console.log(
+            "Sending audio to ML service:",
+            mlUrl
+        );
+
 
         const mlResponse =
             await axios.post(
 
-                "http://127.0.0.1:8000/analyze-voice",
+                mlUrl,
 
                 formData,
 
@@ -79,16 +103,15 @@ const analyzeVoice = async (req, res) => {
                         Infinity,
 
                     maxBodyLength:
-                        Infinity
+                        Infinity,
+
+                    timeout:
+                        300000
 
                 }
 
             );
 
-
-        // ==================================
-        // GET ML RESPONSE
-        // ==================================
 
         const voiceData =
             mlResponse.data;
@@ -99,26 +122,6 @@ const analyzeVoice = async (req, res) => {
             voiceData
         );
 
-
-        // ==================================
-        // DELETE TEMP AUDIO FILE
-        // ==================================
-
-        if (
-            req.file.path &&
-            fs.existsSync(req.file.path)
-        ) {
-
-            fs.unlinkSync(
-                req.file.path
-            );
-
-        }
-
-
-        // ==================================
-        // NORMALIZE RISK SCORE
-        // ==================================
 
         const riskScore =
             Math.min(
@@ -133,10 +136,6 @@ const analyzeVoice = async (req, res) => {
                 100
             );
 
-
-        // ==================================
-        // NORMALIZE RISK LEVEL
-        // ==================================
 
         let riskLevel =
             String(
@@ -173,10 +172,6 @@ const analyzeVoice = async (req, res) => {
         }
 
 
-        // ==================================
-        // TRANSCRIPT
-        // ==================================
-
         const transcript =
             String(
                 voiceData.transcript ??
@@ -184,50 +179,49 @@ const analyzeVoice = async (req, res) => {
                 ""
             );
 
+        const reasons =
 
-        // ==================================
-        // SCAM INDICATORS
-        // ==================================
-
-        const scamIndicators =
             Array.isArray(
-                voiceData.scamIndicators
+                voiceData.reasons
             )
 
-                ? voiceData.scamIndicators
+                ? voiceData.reasons
 
                 : Array.isArray(
-                    voiceData.reasons
+                    voiceData.detectedIndicators
                 )
 
-                    ? voiceData.reasons
+                    ? voiceData.detectedIndicators.map(
+                        (indicator) =>
+                            `Suspicious keyword detected: ${indicator}`
+                    )
 
-                    : voiceData.reason
+                    : [];
 
-                        ? [voiceData.reason]
+        const scamIndicators =
 
-                        : [];
+            Array.isArray(
+                voiceData.detectedIndicators
+            )
 
+                ? voiceData.detectedIndicators
 
-        // ==================================
-        // PREDICTION
-        // ==================================
+                : reasons;
 
         const prediction =
             voiceData.prediction ??
 
             (
                 riskLevel === "HIGH"
+
                     ? "Voice Scam Detected"
+
                     : riskLevel === "MEDIUM"
+
                     ? "Suspicious Voice Activity"
+
                     : "Safe / Low Risk"
             );
-
-
-        // ==================================
-        // CONFIDENCE
-        // ==================================
 
         const confidence =
             Math.min(
@@ -241,55 +235,55 @@ const analyzeVoice = async (req, res) => {
                 100
             );
 
+        const recommendedAction =
+            voiceData.recommendedAction ??
+            voiceData.action ??
 
-        // ==================================
-        // SAVE TO MONGODB
-        // ==================================
+            (
+                riskLevel === "HIGH"
+
+                    ? "Do not share OTP, PIN, passwords or banking information. Verify the caller independently."
+
+                    : riskLevel === "MEDIUM"
+
+                    ? "Be cautious and verify the caller before taking any financial action."
+
+                    : "No strong scam indicators detected. Continue to remain cautious with unknown callers."
+            );
+
+        console.log(
+            "SAVING VOICE ANALYSIS FOR USER:",
+            req.user.id
+        );
+
 
         const savedVoiceAnalysis =
-        await VoiceAnalysis.create({
+            await VoiceAnalysis.create({
 
-            user:
-                req.user.id,
+                user:
+                    req.user.id,
 
-            riskScore,
-
-            riskLevel,
-
-            transcript,
-
-            prediction:
-                riskLevel === "HIGH"
-                    ? "Voice Scam Detected"
-                    : riskLevel === "MEDIUM"
-                    ? "Suspicious Voice Activity"
-                    : "Safe / Low Risk",
-
-            confidence:
                 riskScore,
 
-            reasons,
+                riskLevel,
 
-            recommendedAction
+                transcript,
 
-        });
+                prediction,
+
+                confidence,
+
+                reasons,
+
+                recommendedAction
+
+            });
 
 
         console.log(
             "VOICE ANALYSIS SAVED:",
             savedVoiceAnalysis._id
         );
-
-        const recommendedAction =
-            voiceData.recommendedAction ??
-            voiceData.action ??
-            (
-                riskLevel === "HIGH"
-                    ? "Do not share OTP, PIN, passwords or banking information. Verify the caller independently."
-                    : riskLevel === "MEDIUM"
-                    ? "Be cautious and verify the caller before taking any financial action."
-                    : "No strong scam indicators detected. Continue to remain cautious with unknown callers."
-            );
 
         return res.status(200).json({
 
@@ -311,6 +305,8 @@ const analyzeVoice = async (req, res) => {
 
             confidence,
 
+            reasons,
+
             scamIndicators,
 
             recommendedAction
@@ -328,26 +324,35 @@ const analyzeVoice = async (req, res) => {
         );
 
 
-        // ==================================
-        // DELETE FILE ON ERROR
-        // ==================================
+        return res.status(500).json({
+
+            success: false,
+
+            message:
+                error.response?.data?.message ||
+                error.message ||
+                "Voice analysis failed"
+
+        });
+
+    }
+
+    finally {
 
         if (
-
             req.file &&
-
             req.file.path &&
-
-            fs.existsSync(
-                req.file.path
-            )
-
+            fs.existsSync(req.file.path)
         ) {
 
             try {
 
                 fs.unlinkSync(
                     req.file.path
+                );
+
+                console.log(
+                    "Temporary audio file deleted"
                 );
 
             }
@@ -361,21 +366,6 @@ const analyzeVoice = async (req, res) => {
             }
 
         }
-
-
-        return res.status(500).json({
-
-            success: false,
-
-            message:
-
-                error.response?.data?.message ||
-
-                error.message ||
-
-                "Voice analysis failed"
-
-        });
 
     }
 

@@ -91,6 +91,13 @@ const voiceAnalysisSchema =
 
                 default: ""
 
+            },
+            notificationRead: {
+
+                type: Boolean,
+
+                default: false
+
             }
 
         },

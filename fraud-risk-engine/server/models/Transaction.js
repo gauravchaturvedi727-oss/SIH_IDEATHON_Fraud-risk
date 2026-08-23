@@ -66,7 +66,13 @@ const transactionSchema = new mongoose.Schema(
         reasons: {
             type: [String],
             default: []
+        },
+
+        notificationRead: {
+            type: Boolean,
+            default: false
         }
+
     },
 
     {

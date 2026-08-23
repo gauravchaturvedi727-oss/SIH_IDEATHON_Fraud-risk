@@ -20,11 +20,6 @@ function Login() {
 
     const [loading, setLoading] = useState(false);
 
-
-    // ==========================
-    // HANDLE CHANGE
-    // ==========================
-
     const handleChange = (e) => {
 
         const { name, value } = e.target;
@@ -36,10 +31,6 @@ function Login() {
 
     };
 
-
-    // ==========================
-    // LOGIN
-    // ==========================
 
     const handleSubmit = async (e) => {
 
@@ -65,8 +56,6 @@ function Login() {
                 response.data
             );
 
-
-            // Save token
             if (response.data.token) {
 
                 localStorage.setItem(
@@ -82,8 +71,6 @@ function Login() {
                 "Login successful!"
             );
 
-
-            // Navigate to Dashboard
             navigate("/", {
                 replace: true
             });
@@ -117,8 +104,6 @@ function Login() {
 
         <div className="login-page">
 
-            {/* BACKGROUND */}
-
             <div className="login-grid"></div>
 
             <div className="login-glow login-glow-one"></div>
@@ -127,9 +112,6 @@ function Login() {
 
 
             <div className="login-container">
-
-
-                {/* LEFT SIDE */}
 
                 <section className="login-info">
 
@@ -249,10 +231,6 @@ function Login() {
 
                 </section>
 
-
-
-                {/* RIGHT SIDE */}
-
                 <section className="login-card">
 
 
@@ -279,8 +257,6 @@ function Login() {
                     <form onSubmit={handleSubmit}>
 
 
-                        {/* EMAIL */}
-
                         <div className="login-input-group">
 
                             <label>
@@ -304,10 +280,6 @@ function Login() {
                             </div>
 
                         </div>
-
-
-
-                        {/* PASSWORD */}
 
                         <div className="login-input-group">
 
@@ -333,9 +305,6 @@ function Login() {
 
                         </div>
 
-
-
-                        {/* BUTTON */}
 
                         <button
                             type="submit"
@@ -364,9 +333,6 @@ function Login() {
 
                     </form>
 
-
-
-                    {/* SIGNUP */}
 
                     <div className="login-bottom">
 

@@ -78,6 +78,13 @@ const phishingSchema = new mongoose.Schema(
 
             max: 100
 
+        },
+        notificationRead: {
+
+            type: Boolean,
+
+            default: false
+
         }
 
     },

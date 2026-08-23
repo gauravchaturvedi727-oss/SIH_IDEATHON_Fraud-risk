@@ -2,27 +2,13 @@ const Transaction = require("../models/Transaction");
 const Phishing = require("../models/Phishing");
 const VoiceAnalysis = require("../models/VoiceAnalysis");
 
-
-// =====================================
-// GET DASHBOARD DATA
-// =====================================
-
 const getDashboardData = async (req, res) => {
 
     try {
 
-        // =====================================
-        // LOGGED-IN USER FILTER
-        // =====================================
-
         const userFilter = {
             user: req.user.id
         };
-
-
-        // =====================================
-        // TOTAL COUNTS
-        // =====================================
 
         const [
             totalTransactions,
@@ -43,11 +29,6 @@ const getDashboardData = async (req, res) => {
             totalTransactions +
             totalPhishing +
             totalVoice;
-
-
-        // =====================================
-        // HIGH RISK COUNTS
-        // =====================================
 
         const [
             highRiskTransactions,
@@ -78,11 +59,6 @@ const getDashboardData = async (req, res) => {
             highRiskPhishing +
             highRiskVoice;
 
-
-        // =====================================
-        // MEDIUM RISK COUNTS
-        // =====================================
-
         const [
             mediumRiskTransactions,
             mediumRiskPhishing,
@@ -111,11 +87,6 @@ const getDashboardData = async (req, res) => {
             mediumRiskTransactions +
             mediumRiskPhishing +
             mediumRiskVoice;
-
-
-        // =====================================
-        // LOW RISK COUNTS
-        // =====================================
 
         const [
             lowRiskTransactions,
@@ -146,11 +117,6 @@ const getDashboardData = async (req, res) => {
             lowRiskPhishing +
             lowRiskVoice;
 
-
-        // =====================================
-        // RECENT DATA
-        // =====================================
-
         const [
             recentTransactions,
             recentPhishing,
@@ -173,11 +139,6 @@ const getDashboardData = async (req, res) => {
                 .limit(5)
 
         ]);
-
-
-        // =====================================
-        // FORMAT TRANSACTION ACTIVITY
-        // =====================================
 
         const transactionActivities =
             recentTransactions.map(
@@ -211,11 +172,6 @@ const getDashboardData = async (req, res) => {
                 })
             );
 
-
-        // =====================================
-        // FORMAT PHISHING ACTIVITY
-        // =====================================
-
         const phishingActivities =
             recentPhishing.map(
                 (phishing) => ({
@@ -247,11 +203,6 @@ const getDashboardData = async (req, res) => {
 
                 })
             );
-
-
-        // =====================================
-        // FORMAT VOICE ACTIVITY
-        // =====================================
 
         const voiceActivities =
             recentVoice.map(
@@ -285,11 +236,6 @@ const getDashboardData = async (req, res) => {
                 })
             );
 
-
-        // =====================================
-        // COMBINE ACTIVITIES
-        // =====================================
-
         const recentActivity = [
 
             ...transactionActivities,
@@ -305,11 +251,6 @@ const getDashboardData = async (req, res) => {
                     new Date(a.createdAt)
             )
             .slice(0, 10);
-
-
-        // =====================================
-        // SECURITY SCORE
-        // =====================================
 
         let securityScore = 100;
 
@@ -342,11 +283,6 @@ const getDashboardData = async (req, res) => {
 
         }
 
-
-        // =====================================
-        // DETECTION RATE
-        // =====================================
-
         const detectedThreats =
             totalHighRisk +
             totalMediumRisk;
@@ -368,11 +304,6 @@ const getDashboardData = async (req, res) => {
                 )
 
                 : 0;
-
-
-        // =====================================
-        // RESPONSE
-        // =====================================
 
         return res.status(200).json({
 
@@ -434,7 +365,115 @@ const getDashboardData = async (req, res) => {
 
 };
 
+const clearAllActivity = async (req, res) => {
+
+    try {
+
+        console.log(
+            "CLEAR ACTIVITY REQUEST USER:",
+            req.user
+        );
+
+
+        if (!req.user || !req.user.id) {
+
+            return res.status(401).json({
+
+                success: false,
+
+                message:
+                    "User authentication failed. Please login again."
+
+            });
+
+        }
+
+
+        const userId = req.user.id;
+
+
+        const [
+            transactionResult,
+            phishingResult,
+            voiceResult
+        ] = await Promise.all([
+
+            Transaction.deleteMany({
+                user: userId
+            }),
+
+            Phishing.deleteMany({
+                user: userId
+            }),
+
+            VoiceAnalysis.deleteMany({
+                user: userId
+            })
+
+        ]);
+
+
+        console.log(
+            "DELETE RESULTS:",
+            {
+                transactions:
+                    transactionResult.deletedCount,
+
+                phishing:
+                    phishingResult.deletedCount,
+
+                voice:
+                    voiceResult.deletedCount
+            }
+        );
+
+
+        return res.status(200).json({
+
+            success: true,
+
+            message:
+                "All security activity deleted successfully",
+
+            deleted: {
+
+                transactions:
+                    transactionResult.deletedCount,
+
+                phishing:
+                    phishingResult.deletedCount,
+
+                voice:
+                    voiceResult.deletedCount
+
+            }
+
+        });
+
+    }
+    catch (error) {
+
+        console.error(
+            "CLEAR ACTIVITY ERROR:",
+            error
+        );
+
+
+        return res.status(500).json({
+
+            success: false,
+
+            message:
+                error.message ||
+                "Failed to clear security activity"
+
+        });
+
+    }
+
+};
 
 module.exports = {
-    getDashboardData
+    getDashboardData,
+    clearAllActivity
 };

@@ -66,9 +66,6 @@ function TransactionDetails() {
 
     }, [id]);
 
-
-    // INPUT CHANGE
-
     const handleChange = (e) => {
 
         const {
@@ -87,9 +84,6 @@ function TransactionDetails() {
         });
 
     };
-
-
-    // UPDATE
 
     const handleUpdate = async (e) => {
 
@@ -135,9 +129,6 @@ function TransactionDetails() {
 
         }
     };
-
-
-    // DELETE
 
     const handleDelete = async () => {
 
@@ -269,12 +260,7 @@ function TransactionDetails() {
 
                 {!editMode ? (
 
-                    /* ================= VIEW MODE ================= */
-
                     <div className="details-grid">
-
-
-                        {/* RISK CARD */}
 
                         <section className="details-card risk-main">
 
@@ -370,9 +356,6 @@ function TransactionDetails() {
                             </div>
 
                         </section>
-
-
-                        {/* TRANSACTION INFO */}
 
                         <section className="details-card">
 
@@ -488,9 +471,6 @@ function TransactionDetails() {
                     </div>
 
                 ) : (
-
-                    /* ================= EDIT MODE ================= */
-
                     <section className="details-card edit-card">
 
                         <h2>

@@ -36,10 +36,6 @@ function Transaction() {
         useState(false);
 
 
-    // ==================================
-    // CHANGE
-    // ==================================
-
     const handleChange = (e) => {
 
         const {
@@ -64,11 +60,6 @@ function Transaction() {
         });
 
     };
-
-
-    // ==================================
-    // ANALYZE
-    // ==================================
 
     const analyzeTransaction =
         async (e) => {
@@ -148,10 +139,6 @@ function Transaction() {
         };
 
 
-    // ==================================
-    // RESET
-    // ==================================
-
     const resetForm = () => {
 
         setForm({
@@ -209,11 +196,6 @@ function Transaction() {
 
 
                 <div className="transaction-layout">
-
-
-                    {/* ================================= */}
-                    {/* FORM */}
-                    {/* ================================= */}
 
                     <form
 
@@ -427,11 +409,6 @@ function Transaction() {
 
 
                     </form>
-
-
-                    {/* ================================= */}
-                    {/* RESULT */}
-                    {/* ================================= */}
 
                     <div className="result-card">
 
