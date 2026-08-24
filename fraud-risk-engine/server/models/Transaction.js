@@ -40,7 +40,9 @@ const transactionSchema = new mongoose.Schema(
 
         riskScore: {
             type: Number,
-            default: 0
+            default: 0,
+            min: 0,
+            max: 100
         },
 
         riskLevel: {
@@ -48,7 +50,8 @@ const transactionSchema = new mongoose.Schema(
             enum: [
                 "LOW",
                 "MEDIUM",
-                "HIGH"
+                "HIGH",
+                "CRITICAL"
             ],
             default: "LOW"
         },

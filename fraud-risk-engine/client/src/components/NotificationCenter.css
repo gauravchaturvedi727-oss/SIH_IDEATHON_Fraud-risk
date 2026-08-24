@@ -1,515 +1,490 @@
+/* ==========================================================================
+   FRAUDGUARD AI - CYBER GREEN NOTIFICATION CENTER & PATROLLING ROBOT SENTINELS
+   ========================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap");
+
+:root {
+  /* Matrix Cyber-Green Luminescence */
+  --notif-core: #ffffff;
+  --notif-green: #00ff88;
+  --notif-emerald: #10b981;
+  --notif-mint: #00f5a0;
+  --notif-glow: #00ff66;
+  --notif-dark: #041f0f;
+
+  /* Alert Severity Colors */
+  --notif-red: #ff3366;
+  --notif-yellow: #ffbb00;
+  --notif-blue: #00e5ff;
+
+  /* Deep Glassmorphic Surfaces */
+  --notif-glass-bg: rgba(3, 16, 8, 0.88);
+  --notif-card: rgba(4, 24, 12, 0.65);
+  --notif-card-hover: rgba(6, 36, 18, 0.85);
+  --notif-border: rgba(0, 255, 136, 0.35);
+  --notif-border-dim: rgba(255, 255, 255, 0.08);
+
+  /* Typography */
+  --font-hud: "JetBrains Mono", monospace;
+  --font-main: "Plus Jakarta Sans", sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+}
+
+/* ==========================================================================
+   NOTIFICATION WRAPPER & BELL BUTTON
+   ========================================================================== */
 
 .notification-center {
-    position: relative;
-    display: flex;
-    align-items: center;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
+/* Cyber Bell Icon Trigger */
 .notification-bell {
-    position: relative;
-
-    width: 42px;
-    height: 42px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 12px;
-
-    background: rgba(15, 23, 42, 0.75);
-
-    color: white;
-
-    cursor: pointer;
-
-    transition: 0.25s ease;
+  position: relative;
+  width: 42px;
+  height: 42px;
+  background: rgba(0, 255, 136, 0.08);
+  border: 1px solid var(--notif-border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
 }
-
 
 .notification-bell:hover {
-    transform: translateY(-2px);
-
-    border-color: rgba(34, 211, 238, 0.5);
-
-    background: rgba(30, 41, 59, 0.9);
-
-    box-shadow:
-        0 8px 25px rgba(34, 211, 238, 0.12);
+  background: rgba(0, 255, 136, 0.18);
+  border-color: var(--notif-green);
+  box-shadow: 0 0 18px rgba(0, 255, 136, 0.4);
+  transform: translateY(-2px);
 }
-
 
 .bell-icon {
-    font-size: 19px;
+  font-size: 1.25rem;
+  display: inline-block;
+  transition: transform 0.25s ease;
 }
 
+.notification-bell:hover .bell-icon {
+  animation: bellRingJerking 0.6s ease-in-out infinite alternate;
+}
 
+@keyframes bellRingJerking {
+  0% { transform: rotate(-15deg) scale(1.1); }
+  100% { transform: rotate(15deg) scale(1.1); }
+}
+
+/* Cyber Badge Counter */
 .notification-count {
-    position: absolute;
-
-    top: -6px;
-    right: -6px;
-
-    min-width: 18px;
-    height: 18px;
-
-    padding: 0 4px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    border-radius: 50%;
-
-    background: #ef4444;
-
-    color: white;
-
-    font-size: 10px;
-    font-weight: 800;
-
-    border: 2px solid #0f172a;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  background: var(--notif-red);
+  color: #fff;
+  border-radius: 9999px;
+  font-family: var(--font-hud);
+  font-size: 0.65rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 0 10px var(--notif-red);
+  animation: badgeAlertPulse 2s infinite;
 }
 
+@keyframes badgeAlertPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); filter: brightness(1.3); }
+}
+
+/* ==========================================================================
+   DROPDOWN MENU TERMINAL
+   ========================================================================== */
 
 .notification-dropdown {
-    position: absolute;
-
-    top: calc(100% + 14px);
-    right: 0;
-
-    width: 390px;
-    max-width: calc(100vw - 24px);
-
-    z-index: 9999;
-
-    overflow: hidden;
-
-    border-radius: 18px;
-
-    border: 1px solid rgba(148, 163, 184, 0.18);
-
-    background:
-        linear-gradient(
-            145deg,
-            rgba(15, 23, 42, 0.98),
-            rgba(2, 6, 23, 0.98)
-        );
-
-    box-shadow:
-        0 25px 60px rgba(0, 0, 0, 0.45);
-
-    animation: notificationSlide 0.25s ease;
+  position: absolute;
+  top: 54px;
+  right: 0;
+  width: 380px;
+  max-width: 90vw;
+  background: var(--notif-glass-bg);
+  border: 1px solid var(--notif-border);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 
+    0 20px 50px rgba(0, 0, 0, 0.9),
+    0 0 30px rgba(0, 255, 136, 0.15),
+    inset 0 0 25px rgba(0, 255, 136, 0.03);
+  z-index: 1000;
+  overflow: hidden;
+  animation: dropdownBoot 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-
-@keyframes notificationSlide {
-
-    from {
-        opacity: 0;
-        transform:
-            translateY(-10px)
-            scale(0.98);
-    }
-
-    to {
-        opacity: 1;
-        transform:
-            translateY(0)
-            scale(1);
-    }
-
+@keyframes dropdownBoot {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
+/* ==========================================================================
+   🤖 1. RUNNING & JERKING HANDS CYBER ROBOT ON NOTIFICATION TOP BAR
+   ========================================================================== */
 
 .notification-header {
-    padding: 18px 20px;
-
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    border-bottom:
-        1px solid rgba(148, 163, 184, 0.12);
+  position: relative;
+  padding: 1.25rem 1.4rem;
+  background: linear-gradient(180deg, rgba(0, 255, 136, 0.08), transparent);
+  border-bottom: 1px solid var(--notif-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  overflow: hidden;
 }
 
+/* Running Laser Patrol Line on Header Top */
+.notification-header::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--notif-green), var(--notif-mint), transparent);
+  animation: patrolLaser 3.5s linear infinite;
+  z-index: 2;
+}
+
+@keyframes patrolLaser {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* 🤖 Pure CSS Animated Cyber Robot Running Across Header with Jerking Arms & Blinking Eyes */
+.notification-header::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  z-index: 5;
+  pointer-events: none;
+
+  /* Layered Vector Robot with Antenna, Visor Eyes, Jerking Arms, & Running Feet */
+  background:
+    /* Blinking Antenna Dot */
+    radial-gradient(circle at 50% 10%, #ffffff 1.5px, transparent 2px),
+    /* Antenna Stick */
+    linear-gradient(to bottom, #00ff88, #00ff88) 50% 15% / 1.5px 4px no-repeat,
+    /* Robot Head Box */
+    linear-gradient(to bottom, #00ff88, #00ff88) 50% 32% / 14px 10px no-repeat,
+    /* Blinking Cyan Eye Visor Laser */
+    radial-gradient(ellipse at 50% 32%, #010804 5px, transparent 6px),
+    radial-gradient(circle at 50% 32%, #ffffff 1px, #00ff88 2px, transparent 3px),
+    /* Torso Body Box */
+    linear-gradient(to bottom, #00ff88, #00ff88) 50% 64% / 16px 8px no-repeat,
+    /* Left Jerking Hand Vector */
+    linear-gradient(to right, #ffffff, #00ff88) 15% 55% / 5px 2px no-repeat,
+    /* Right Jerking Hand Vector */
+    linear-gradient(to right, #00ff88, #ffffff) 85% 55% / 5px 2px no-repeat,
+    /* Left & Right Running Feet */
+    linear-gradient(to bottom, #00ff88, #00ff88) 36% 92% / 2px 5px no-repeat,
+    linear-gradient(to bottom, #00ff88, #00ff88) 64% 92% / 2px 5px no-repeat;
+
+  filter: drop-shadow(0 0 6px var(--notif-green));
+  animation: 
+    robotPatrolSprint 5s linear infinite,
+    robotJerkingArmsAction 0.25s ease-in-out infinite alternate;
+}
+
+/* Robot Running Sprints Left to Right */
+@keyframes robotPatrolSprint {
+  0% {
+    left: -35px;
+    transform: scaleX(1);
+  }
+  48% {
+    left: 92%;
+    transform: scaleX(1);
+  }
+  50% {
+    left: 92%;
+    transform: scaleX(-1); /* Turn around */
+  }
+  98% {
+    left: -35px;
+    transform: scaleX(-1);
+  }
+  100% {
+    left: -35px;
+    transform: scaleX(1);
+  }
+}
+
+/* Jerking Arms & Running Bobbing Physics */
+@keyframes robotJerkingArmsAction {
+  0% {
+    transform: translateY(0px) rotate(-4deg);
+    filter: drop-shadow(0 0 5px var(--notif-green));
+  }
+  100% {
+    transform: translateY(-3px) rotate(4deg);
+    filter: drop-shadow(0 0 10px var(--notif-mint));
+  }
+}
 
 .notification-header > div span {
-    display: block;
-
-    margin-bottom: 4px;
-
-    color: #22d3ee;
-
-    font-size: 10px;
-    font-weight: 800;
-
-    letter-spacing: 1.5px;
+  font-family: var(--font-hud);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--notif-green);
+  display: block;
 }
-
 
 .notification-header h3 {
-    margin: 0;
-
-    color: #f8fafc;
-
-    font-size: 19px;
+  font-family: var(--font-main);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0.2rem 0 0 0;
 }
 
-
+/* Mark All Read Button */
 .mark-read-btn {
-    border: none;
-
-    background: transparent;
-
-    color: #22d3ee;
-
-    font-size: 12px;
-    font-weight: 700;
-
-    cursor: pointer;
-
-    transition: 0.2s ease;
+  background: rgba(0, 255, 136, 0.08);
+  border: 1px solid var(--notif-border);
+  color: var(--notif-green);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-hud);
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
-
 
 .mark-read-btn:hover {
-    color: #67e8f9;
+  background: var(--notif-green);
+  color: #010804;
+  box-shadow: 0 0 12px var(--notif-green);
 }
+
+/* ==========================================================================
+   NOTIFICATION LIST & ITEMS
+   ========================================================================== */
 
 .notification-list {
-    max-height: 420px;
-
-    overflow-y: auto;
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
-
+/* Custom Cyber Green Scrollbar */
 .notification-list::-webkit-scrollbar {
-    width: 5px;
+  width: 4px;
 }
-
-
-.notification-list::-webkit-scrollbar-track {
-    background: transparent;
-}
-
 
 .notification-list::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.25);
-    border-radius: 10px;
-}
-
-
-
-.notification-item {
-    position: relative;
-
-    display: flex;
-
-    gap: 12px;
-
-    padding: 16px 20px;
-
-    border-bottom:
-        1px solid rgba(148, 163, 184, 0.08);
-
-    transition: 0.2s ease;
-}
-
-
-.notification-item:hover {
-    background:
-        rgba(30, 41, 59, 0.55);
-}
-
-
-.notification-item.unread {
-    background:
-        rgba(30, 41, 59, 0.35);
-}
-
-
-
-.notification-item.high.unread {
-    border-left:
-        3px solid #ef4444;
-}
-
-
-
-.notification-item.medium.unread {
-    border-left:
-        3px solid #facc15;
-}
-
-
-.notification-item.low.unread {
-    border-left:
-        3px solid #22c55e;
-}
-
-
-.notification-risk-icon {
-    width: 38px;
-    height: 38px;
-
-    flex-shrink: 0;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    border-radius: 12px;
-
-    font-size: 18px;
-
-    background:
-        rgba(148, 163, 184, 0.1);
-}
-
-
-.notification-risk-icon.high {
-    background:
-        rgba(239, 68, 68, 0.12);
-}
-
-
-.notification-risk-icon.medium {
-    background:
-        rgba(250, 204, 21, 0.12);
-}
-
-
-.notification-risk-icon.low {
-    background:
-        rgba(34, 197, 94, 0.12);
-}
-
-
-.notification-content {
-    flex: 1;
-
-    min-width: 0;
-}
-
-
-.notification-content p {
-    margin: 0 0 9px;
-
-    color: #e2e8f0;
-
-    font-size: 13px;
-
-    line-height: 1.5;
-}
-
-
-.notification-content > div {
-    display: flex;
-    align-items: center;
-
-    gap: 10px;
-}
-
-
-.notification-content small {
-    color: #64748b;
-
-    font-size: 11px;
-}
-
-.notification-risk {
-    padding: 4px 8px;
-
-    border-radius: 6px;
-
-    font-size: 9px;
-    font-weight: 800;
-
-    letter-spacing: 0.8px;
-}
-
-
-.notification-risk.high {
-    color: #fca5a5;
-
-    background:
-        rgba(239, 68, 68, 0.13);
-}
-
-
-.notification-risk.medium {
-    color: #fde047;
-
-    background:
-        rgba(250, 204, 21, 0.12);
-}
-
-
-.notification-risk.low {
-    color: #86efac;
-
-    background:
-        rgba(34, 197, 94, 0.12);
-}
-
-
-.unread-dot {
-    width: 7px;
-    height: 7px;
-
-    margin-top: 6px;
-
-    flex-shrink: 0;
-
-    border-radius: 50%;
-
-    background: #22d3ee;
-
-    box-shadow:
-        0 0 12px rgba(34, 211, 238, 0.8);
-}
-
-
-.notification-empty {
-    padding: 50px 25px;
-
-    text-align: center;
-}
-
-
-.notification-empty div {
-    font-size: 35px;
-
-    margin-bottom: 12px;
-}
-
-
-.notification-empty strong {
-    display: block;
-
-    color: #f8fafc;
-
-    margin-bottom: 6px;
-}
-
-
-.notification-empty p {
-    margin: 0;
-
-    color: #64748b;
-
-    font-size: 13px;
+  background: rgba(0, 255, 136, 0.3);
+  border-radius: 9999px;
 }
 
 .notification-loading {
-    padding: 40px;
-
-    text-align: center;
-
-    color: #94a3b8;
-
-    font-size: 13px;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  font-family: var(--font-hud);
+  font-size: 0.8rem;
+  color: var(--notif-green);
+  animation: radarBlink 1.4s infinite;
 }
 
+@keyframes radarBlink {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
 
+.notification-empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.notification-empty div {
+  font-size: 2.2rem;
+  filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.4));
+  animation: emptyBob 3s ease-in-out infinite alternate;
+}
+
+@keyframes emptyBob {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-6px); }
+}
+
+.notification-empty strong {
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.notification-empty p {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0;
+}
+
+/* Notification Item Card */
+.notification-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  background: var(--notif-card);
+  border: 1px solid var(--notif-border-dim);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.notification-item:hover {
+  background: var(--notif-card-hover);
+  border-color: var(--notif-border);
+  transform: translateX(4px);
+}
+
+/* Unread Glowing Border & Background Accent */
+.notification-item.unread {
+  background: rgba(0, 255, 136, 0.08);
+  border-left: 3px solid var(--notif-green);
+}
+
+.notification-item.unread.high {
+  border-left-color: var(--notif-red);
+}
+
+.notification-item.unread.medium {
+  border-left-color: var(--notif-yellow);
+}
+
+/* Risk Badge Icon Box */
+.notification-risk-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+}
+
+.notification-risk-icon.low {
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid var(--notif-border);
+}
+
+.notification-risk-icon.medium {
+  background: rgba(255, 187, 0, 0.1);
+  border: 1px solid var(--notif-yellow);
+}
+
+.notification-risk-icon.high {
+  background: rgba(255, 51, 102, 0.1);
+  border: 1px solid var(--notif-red);
+}
+
+.notification-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow: hidden;
+}
+
+.notification-content p {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.notification-content div {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.notification-risk {
+  font-family: var(--font-hud);
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.notification-risk.low { background: rgba(0, 255, 136, 0.15); color: var(--notif-green); }
+.notification-risk.medium { background: rgba(255, 187, 0, 0.15); color: var(--notif-yellow); }
+.notification-risk.high { background: rgba(255, 51, 102, 0.15); color: var(--notif-red); }
+
+.notification-content small {
+  font-family: var(--font-hud);
+  font-size: 0.68rem;
+  color: #64748b;
+}
+
+/* Pulsing Unread Dot */
+.unread-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--notif-green);
+  box-shadow: 0 0 8px var(--notif-green);
+  animation: unreadBlink 1.5s infinite;
+}
+
+@keyframes unreadBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.7); }
+}
+
+/* ==========================================================================
+   NOTIFICATION FOOTER TERMINAL
+   ========================================================================== */
 
 .notification-footer {
-    padding: 13px 20px;
-
-    border-top:
-        1px solid rgba(148, 163, 184, 0.1);
-
-    background:
-        rgba(2, 6, 23, 0.5);
-
-    color: #64748b;
-
-    text-align: center;
-
-    font-size: 11px;
-}
-
-.navbar-right {
-    display: flex;
-
-    align-items: center;
-
-    gap: 10px;
-}
-
-@media (max-width: 768px) {
-
-    .notification-bell {
-        width: 40px;
-        height: 40px;
-    }
-
-
-    .notification-dropdown {
-        position: fixed;
-
-        top: 70px;
-        right: 12px;
-
-        width: calc(100vw - 24px);
-
-        max-width: none;
-
-        max-height: calc(100vh - 90px);
-    }
-
-
-    .notification-list {
-        max-height:
-            calc(100vh - 220px);
-    }
-
-
-    .notification-header {
-        padding: 16px;
-    }
-
-
-    .notification-item {
-        padding: 14px 16px;
-    }
-
-
-    .notification-content p {
-        font-size: 12px;
-    }
-
-}
-
-
-@media (max-width: 480px) {
-
-    .notification-dropdown {
-        top: 64px;
-
-        border-radius: 15px;
-    }
-
-
-    .notification-header h3 {
-        font-size: 17px;
-    }
-
-
-    .notification-risk-icon {
-        width: 34px;
-        height: 34px;
-
-        font-size: 16px;
-    }
-
-
-    .notification-content > div {
-        flex-wrap: wrap;
-
-        gap: 6px;
-    }
-
+  padding: 0.8rem;
+  background: rgba(2, 10, 5, 0.9);
+  border-top: 1px solid var(--notif-border-dim);
+  text-align: center;
+  font-family: var(--font-hud);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--notif-green);
+  letter-spacing: 0.5px;
 }

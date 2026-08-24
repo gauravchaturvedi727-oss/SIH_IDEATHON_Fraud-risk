@@ -1,7 +1,186 @@
 const axios = require("axios");
+const Transaction = require("../models/Transaction");
 
-const Transaction =
-    require("../models/Transaction");
+
+// ==========================================
+// GET ML SERVICE URL
+// ==========================================
+
+const getMLUrl = () => {
+
+    const baseUrl = process.env.ML_SERVICE_URL;
+
+    if (!baseUrl) {
+
+        throw new Error(
+            "ML_SERVICE_URL is not configured"
+        );
+
+    }
+
+    return `${baseUrl.replace(/\/$/, "")}/predict`;
+
+};
+
+
+// ==========================================
+// CONVERT VALUE TO BOOLEAN
+// Handles true, false, "true", "false", 1, 0
+// ==========================================
+
+const toBoolean = (value) => {
+
+    if (
+        value === true ||
+        value === "true" ||
+        value === 1 ||
+        value === "1"
+    ) {
+        return true;
+    }
+
+    return false;
+
+};
+
+
+// ==========================================
+// VALIDATE TRANSACTION DATA
+// ==========================================
+
+const validateTransactionData = (data) => {
+
+    const amount = Number(data.amount);
+
+    if (
+        data.amount === undefined ||
+        data.amount === null ||
+        data.amount === "" ||
+        Number.isNaN(amount) ||
+        amount < 0
+    ) {
+
+        throw new Error(
+            "Valid transaction amount is required"
+        );
+
+    }
+
+    return {
+
+        amount,
+
+        newDevice:
+            toBoolean(data.newDevice),
+
+        newLocation:
+            toBoolean(data.newLocation),
+
+        rapidTransactions:
+            toBoolean(data.rapidTransactions),
+
+        failedLogins:
+            toBoolean(data.failedLogins),
+
+        otpRequests:
+            toBoolean(data.otpRequests)
+
+    };
+
+};
+
+
+// ==========================================
+// ANALYZE WITH ML SERVICE
+// ==========================================
+
+const analyzeWithML = async (data) => {
+
+    const mlUrl = getMLUrl();
+
+    console.log(
+        "SENDING TRANSACTION TO ML:",
+        mlUrl
+    );
+
+
+    const mlResponse = await axios.post(
+
+        mlUrl,
+
+        data,
+
+        {
+
+            timeout: 300000,
+
+            headers: {
+
+                "Content-Type":
+                    "application/json"
+
+            }
+
+        }
+
+    );
+
+
+    console.log(
+        "ML RESPONSE:",
+        mlResponse.data
+    );
+
+
+    const mlData = mlResponse.data;
+
+
+    // ======================================
+    // VALIDATE ML RESPONSE
+    // ======================================
+
+    if (
+        typeof mlData.riskScore === "undefined" ||
+        !mlData.riskLevel
+    ) {
+
+        throw new Error(
+            "Invalid response received from ML service"
+        );
+
+    }
+
+
+    return {
+
+        riskScore:
+            Number(mlData.riskScore) || 0,
+
+        riskLevel:
+            String(
+                mlData.riskLevel || "LOW"
+            ).toUpperCase(),
+
+        recommendedAction:
+            mlData.recommendedAction ||
+            "Verify the transaction before proceeding.",
+
+        mlProbability:
+            Number(mlData.mlProbability) || 0,
+
+        reasons:
+            Array.isArray(mlData.reasons)
+                ? mlData.reasons
+                : []
+
+    };
+
+};
+
+
+// ==========================================
+// CREATE TRANSACTION
+// ==========================================
 
 const createTransaction = async (
     req,
@@ -10,76 +189,70 @@ const createTransaction = async (
 
     try {
 
-        const {
-            amount,
-            newDevice,
-            newLocation,
-            rapidTransactions,
-            failedLogins,
-            otpRequests
-        } = req.body;
+        // =====================================
+        // CHECK AUTHENTICATION
+        // =====================================
 
-        const mlResponse =
-            await axios.post(
-                "http://127.0.0.1:8000/predict",
+        if (!req.user?.id) {
 
-                {
-                    amount,
-                    newDevice,
-                    newLocation,
-                    rapidTransactions,
-                    failedLogins,
-                    otpRequests
-                }
+            return res.status(401).json({
+
+                success: false,
+
+                message:
+                    "User authentication failed. Please login again."
+
+            });
+
+        }
+
+
+        // =====================================
+        // VALIDATE DATA
+        // =====================================
+
+        const transactionData =
+            validateTransactionData(
+                req.body
             );
 
 
-        const {
+        console.log(
+            "TRANSACTION DATA:",
+            transactionData
+        );
 
-            riskScore,
 
-            riskLevel,
+        // =====================================
+        // ML ANALYSIS
+        // =====================================
 
-            recommendedAction,
+        const mlResult =
+            await analyzeWithML(
+                transactionData
+            );
 
-            mlProbability,
 
-            reasons
+        // =====================================
+        // SAVE TRANSACTION
+        // =====================================
 
-        } = mlResponse.data;
-
-        
         const transaction =
             await Transaction.create({
 
-                user: req.user.id,
+                user:
+                    req.user.id,
 
-                amount,
+                ...transactionData,
 
-                newDevice,
-
-                newLocation,
-
-                rapidTransactions,
-
-                failedLogins,
-
-                otpRequests,
-
-                riskScore,
-
-                riskLevel,
-
-                recommendedAction,
-
-                mlProbability,
-
-                reasons
+                ...mlResult
 
             });
 
 
-        res.status(201).json({
+        return res.status(201).json({
+
+            success: true,
 
             message:
                 "Transaction analyzed successfully",
@@ -88,16 +261,15 @@ const createTransaction = async (
 
         });
 
-
-    } 
+    }
     catch (error) {
 
         console.error(
-            "========== TRANSACTION ERROR =========="
+            "========== CREATE TRANSACTION ERROR =========="
         );
 
         console.error(
-            "ERROR MESSAGE:",
+            "MESSAGE:",
             error.message
         );
 
@@ -107,39 +279,46 @@ const createTransaction = async (
         );
 
         console.error(
-            "FLASK RESPONSE:",
+            "ML RESPONSE:",
             error.response?.data
         );
 
         console.error(
-            "ERROR CODE:",
+            "CODE:",
             error.code
         );
 
         console.error(
-            "========================================"
+            "=============================================="
         );
 
 
-        res.status(500).json({
+        return res.status(
+
+            error.message.includes("required") ||
+            error.message.includes("Valid transaction")
+                ? 400
+                : 500
+
+        ).json({
+
+            success: false,
 
             message:
                 error.response?.data?.message ||
                 error.message ||
-                "Risk analysis failed",
-
-            details:
-                error.response?.data ||
-                null
+                "Risk analysis failed"
 
         });
 
     }
 
-
-
 };
 
+
+// ==========================================
+// GET ALL TRANSACTIONS
+// ==========================================
 
 const getTransactions = async (
     req,
@@ -148,32 +327,68 @@ const getTransactions = async (
 
     try {
 
-        const transactions =
-            await Transaction.find({
-                user: req.user.id
-            })
-            .sort({
-                createdAt: -1
+        if (!req.user?.id) {
+
+            return res.status(401).json({
+
+                success: false,
+
+                message:
+                    "User authentication failed"
+
             });
 
+        }
 
-        res.json(
+
+        const transactions =
+            await Transaction.find({
+
+                user:
+                    req.user.id
+
+            })
+                .sort({
+
+                    createdAt: -1
+
+                });
+
+
+        return res.status(200).json({
+
+            success: true,
+
             transactions
-        );
-
-
-    } catch (error) {
-
-        res.status(500).json({
-
-            message:
-                error.message
 
         });
 
     }
+    catch (error) {
+
+        console.error(
+            "GET TRANSACTIONS ERROR:",
+            error.message
+        );
+
+
+        return res.status(500).json({
+
+            success: false,
+
+            message:
+                "Failed to fetch transactions"
+
+        });
+
+    }
+
 };
 
+
+// ==========================================
+// GET TRANSACTION BY ID
+// ==========================================
 
 const getTransactionById = async (
     req,
@@ -185,9 +400,11 @@ const getTransactionById = async (
         const transaction =
             await Transaction.findOne({
 
-                _id: req.params.id,
+                _id:
+                    req.params.id,
 
-                user: req.user.id
+                user:
+                    req.user.id
 
             });
 
@@ -195,6 +412,8 @@ const getTransactionById = async (
         if (!transaction) {
 
             return res.status(404).json({
+
+                success: false,
 
                 message:
                     "Transaction not found"
@@ -204,22 +423,40 @@ const getTransactionById = async (
         }
 
 
-        res.json(
+        return res.status(200).json({
+
+            success: true,
+
             transaction
-        );
-
-
-    } catch (error) {
-
-        res.status(500).json({
-
-            message:
-                error.message
 
         });
 
     }
+    catch (error) {
+
+        console.error(
+            "GET TRANSACTION ERROR:",
+            error.message
+        );
+
+
+        return res.status(500).json({
+
+            success: false,
+
+            message:
+                "Failed to fetch transaction"
+
+        });
+
+    }
+
 };
+
+
+// ==========================================
+// UPDATE TRANSACTION
+// ==========================================
 
 const updateTransaction = async (
     req,
@@ -228,94 +465,27 @@ const updateTransaction = async (
 
     try {
 
-        const {
+        // =====================================
+        // CHECK TRANSACTION EXISTS
+        // =====================================
 
-            amount,
-            newDevice,
-            newLocation,
-            rapidTransactions,
-            failedLogins,
-            otpRequests
+        const existingTransaction =
+            await Transaction.findOne({
 
-        } = req.body;
+                _id:
+                    req.params.id,
 
+                user:
+                    req.user.id
 
-        const mlResponse =
-            await axios.post(
-
-                "http://127.0.0.1:8000/predict",
-
-                {
-
-                    amount,
-                    newDevice,
-                    newLocation,
-                    rapidTransactions,
-                    failedLogins,
-                    otpRequests
-
-                }
-
-            );
+            });
 
 
-        const {
-
-            riskScore,
-            riskLevel,
-            recommendedAction,
-            mlProbability,
-            reasons
-
-        } = mlResponse.data;
-
-
-        const transaction =
-            await Transaction.findOneAndUpdate(
-
-                {
-                    _id: req.params.id,
-
-                    user: req.user.id
-                },
-
-                {
-
-                    amount,
-
-                    newDevice,
-
-                    newLocation,
-
-                    rapidTransactions,
-
-                    failedLogins,
-
-                    otpRequests,
-
-                    riskScore,
-
-                    riskLevel,
-
-                    recommendedAction,
-
-                    mlProbability,
-
-                    reasons
-
-                },
-
-                {
-                    new: true,
-                    runValidators: true
-                }
-
-            );
-
-
-        if (!transaction) {
+        if (!existingTransaction) {
 
             return res.status(404).json({
+
+                success: false,
 
                 message:
                     "Transaction not found"
@@ -325,27 +495,94 @@ const updateTransaction = async (
         }
 
 
-        res.json({
+        // =====================================
+        // VALIDATE UPDATED DATA
+        // =====================================
+
+        const transactionData =
+            validateTransactionData(
+                req.body
+            );
+
+
+        // =====================================
+        // RUN ML ANALYSIS AGAIN
+        // =====================================
+
+        const mlResult =
+            await analyzeWithML(
+                transactionData
+            );
+
+
+        // =====================================
+        // UPDATE DATABASE
+        // =====================================
+
+        const transaction =
+            await Transaction.findByIdAndUpdate(
+
+                req.params.id,
+
+                {
+
+                    ...transactionData,
+
+                    ...mlResult
+
+                },
+
+                {
+
+                    new: true,
+
+                    runValidators: true
+
+                }
+
+            );
+
+
+        return res.status(200).json({
+
+            success: true,
 
             message:
-                "Transaction updated successfully",
+                "Transaction updated and re-analyzed successfully",
 
             transaction
 
         });
 
+    }
+    catch (error) {
 
-    } catch (error) {
+        console.error(
+            "UPDATE TRANSACTION ERROR:",
+            error.response?.data ||
+            error.message
+        );
 
-        res.status(500).json({
+
+        return res.status(500).json({
+
+            success: false,
 
             message:
-                error.message
+                error.response?.data?.message ||
+                error.message ||
+                "Failed to update transaction"
 
         });
 
     }
+
 };
+
+
+// ==========================================
+// DELETE TRANSACTION
+// ==========================================
 
 const deleteTransaction = async (
     req,
@@ -357,9 +594,11 @@ const deleteTransaction = async (
         const transaction =
             await Transaction.findOneAndDelete({
 
-                _id: req.params.id,
+                _id:
+                    req.params.id,
 
-                user: req.user.id
+                user:
+                    req.user.id
 
             });
 
@@ -367,6 +606,8 @@ const deleteTransaction = async (
         if (!transaction) {
 
             return res.status(404).json({
+
+                success: false,
 
                 message:
                     "Transaction not found"
@@ -376,26 +617,41 @@ const deleteTransaction = async (
         }
 
 
-        res.json({
+        return res.status(200).json({
+
+            success: true,
 
             message:
                 "Transaction deleted successfully"
 
         });
 
+    }
+    catch (error) {
 
-    } catch (error) {
+        console.error(
+            "DELETE TRANSACTION ERROR:",
+            error.message
+        );
 
-        res.status(500).json({
+
+        return res.status(500).json({
+
+            success: false,
 
             message:
-                error.message
+                "Failed to delete transaction"
 
         });
 
     }
+
 };
 
+
+// ==========================================
+// EXPORTS
+// ==========================================
 
 module.exports = {
 

@@ -5,7 +5,8 @@ const router = express.Router();
 const multer = require("multer");
 
 const {
-    analyzeVoice
+    analyzeVoice,
+    analyzeTranscript
 } = require("../controllers/voiceController");
 
 const protect =
@@ -23,6 +24,14 @@ router.post(
     protect,
     upload.single("audio"),
     analyzeVoice
+);
+
+
+// NEW - LIVE SPEECH TRANSCRIPT ANALYSIS
+router.post(
+    "/analyze-text",
+    protect,
+    analyzeTranscript
 );
 
 

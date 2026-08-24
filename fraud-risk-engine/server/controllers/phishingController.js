@@ -1,5 +1,437 @@
 const Phishing = require("../models/Phishing");
 
+
+// ======================================================
+// PHISHING / SCAM TEXT ANALYSIS ENGINE
+// ======================================================
+
+const analyzeMessage = (message) => {
+
+    const text = String(message || "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+
+
+    let riskScore = 0;
+
+    const reasons = [];
+
+    const categories = new Set();
+
+
+    // ==================================================
+    // HELPER
+    // ==================================================
+
+    const addSignal = (
+        condition,
+        score,
+        reason,
+        category
+    ) => {
+
+        if (!condition) return;
+
+        riskScore += score;
+
+        if (!reasons.includes(reason)) {
+
+            reasons.push(reason);
+
+        }
+
+        if (category) {
+
+            categories.add(category);
+
+        }
+
+    };
+
+
+    // ==================================================
+    // 1. LINKS / URL DETECTION
+    // ==================================================
+
+    const hasUrl =
+        /(https?:\/\/|www\.|bit\.ly\/|tinyurl\.com\/|t\.co\/)/i
+            .test(text);
+
+
+    addSignal(
+        hasUrl,
+        20,
+        "Suspicious link or URL detected",
+        "link"
+    );
+
+
+    // ==================================================
+    // 2. OTP / PASSWORD
+    // ==================================================
+
+    addSignal(
+        /\botp\b/.test(text),
+        30,
+        "OTP-related request detected",
+        "credential"
+    );
+
+    addSignal(
+        /one[- ]?time password/.test(text),
+        30,
+        "One-time password request detected",
+        "credential"
+    );
+
+    addSignal(
+        /share.{0,30}otp|send.{0,30}otp|tell.{0,30}otp/i.test(text),
+        20,
+        "Request to share OTP detected",
+        "credential"
+    );
+
+    addSignal(
+        /\bcvv\b|cvv number|card cvv/.test(text),
+        30,
+        "Request for CVV detected",
+        "credential"
+    );
+
+    addSignal(
+        /atm pin|upi pin|share.{0,20}pin|tell.{0,20}pin/.test(text),
+        30,
+        "Request for PIN detected",
+        "credential"
+    );
+
+    addSignal(
+        /share.{0,30}password|send.{0,30}password|tell.{0,30}password|login password/.test(text),
+        30,
+        "Request for password detected",
+        "credential"
+    );
+
+
+    // ==================================================
+    // 3. CARD / BANK DETAILS
+    // ==================================================
+
+    addSignal(
+        /card number|card details|debit card details|credit card details/.test(text),
+        25,
+        "Request for card information detected",
+        "credential"
+    );
+
+    addSignal(
+        /bank details|bank account|account details|account number/.test(text),
+        20,
+        "Sensitive banking information mentioned",
+        "credential"
+    );
+
+
+    // ==================================================
+    // 4. ACCOUNT BLOCK / KYC
+    // ==================================================
+
+    addSignal(
+        /account.{0,30}(blocked|suspended|freeze|frozen|closed)|blocked.{0,30}account/.test(text),
+        25,
+        "Account blocking or suspension threat detected",
+        "account"
+    );
+
+    addSignal(
+        /\bkyc\b|complete kyc|update kyc|kyc verification|verify.{0,20}kyc/.test(text),
+        20,
+        "KYC verification request detected",
+        "account"
+    );
+
+
+    // ==================================================
+    // 5. URGENCY / PRESSURE
+    // ==================================================
+
+    addSignal(
+        /\burgent\b|urgently|immediately|right now|act now|hurry|do it now|without delay/.test(text),
+        15,
+        "Urgency or pressure tactic detected",
+        "urgency"
+    );
+
+    addSignal(
+        /within.{0,20}(minutes?|hours?)|last chance|final warning/.test(text),
+        15,
+        "Deadline or final-warning pressure detected",
+        "urgency"
+    );
+
+
+    // ==================================================
+    // 6. BANK / AUTHORITY IMPERSONATION
+    // ==================================================
+
+    addSignal(
+        /bank security|bank officer|bank representative|calling from.{0,20}bank|customer care/.test(text),
+        20,
+        "Possible bank impersonation detected",
+        "authority"
+    );
+
+    addSignal(
+        /government|police|cyber crime|income tax|tax department|legal department/.test(text),
+        20,
+        "Possible authority impersonation detected",
+        "authority"
+    );
+
+
+    // ==================================================
+    // 7. FEAR / THREATS
+    // ==================================================
+
+    addSignal(
+        /arrest warrant|you will be arrested|\barrest\b/.test(text),
+        35,
+        "Arrest or warrant threat detected",
+        "threat"
+    );
+
+    addSignal(
+        /legal action|police case|court case|case against you|criminal case/.test(text),
+        25,
+        "Legal or criminal threat detected",
+        "threat"
+    );
+
+    addSignal(
+        /complaint against you|allegations?|jail|prison/.test(text),
+        20,
+        "Fear-based threat language detected",
+        "threat"
+    );
+
+
+    // ==================================================
+    // 8. MONEY TRANSFER
+    // ==================================================
+
+    addSignal(
+        /send money|transfer money|make payment|pay immediately|pay now|transfer amount/.test(text),
+        30,
+        "Suspicious request for money or payment detected",
+        "money"
+    );
+
+    addSignal(
+        /upi.{0,30}(pay|payment|transfer)|scan.{0,20}(qr|code)/.test(text),
+        25,
+        "Suspicious UPI or payment request detected",
+        "money"
+    );
+
+
+    // ==================================================
+    // 9. REFUND / PRIZE
+    // ==================================================
+
+    addSignal(
+        /claim.{0,20}refund|refund amount|get.{0,20}refund/.test(text),
+        15,
+        "Potential refund scam pattern detected",
+        "money"
+    );
+
+    addSignal(
+        /claim.{0,20}prize|you are a winner|you have won|lottery winner|congratulations.{0,50}(won|winner|prize)/.test(text),
+        20,
+        "Prize or lottery scam indicator detected",
+        "money"
+    );
+
+
+    // ==================================================
+    // 10. CALLBACK + PHONE NUMBER
+    // ==================================================
+
+    const phonePattern =
+        /\b(?:\+?\d{1,3}[-.\s]?)?\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/;
+
+
+    addSignal(
+        phonePattern.test(text) &&
+        /call.{0,20}back|return.{0,20}call|contact.{0,20}immediately/.test(text),
+        20,
+        "Suspicious callback request with phone number detected",
+        "callback"
+    );
+
+
+    // ==================================================
+    // COMBINATION BONUSES
+    // ==================================================
+
+    if (
+        categories.has("link") &&
+        categories.has("credential")
+    ) {
+
+        riskScore += 20;
+
+        reasons.push(
+            "Link combined with a request for sensitive credentials"
+        );
+
+    }
+
+
+    if (
+        categories.has("urgency") &&
+        categories.has("credential")
+    ) {
+
+        riskScore += 15;
+
+        reasons.push(
+            "Urgency combined with credential theft indicators"
+        );
+
+    }
+
+
+    if (
+        categories.has("authority") &&
+        categories.has("threat")
+    ) {
+
+        riskScore += 25;
+
+        reasons.push(
+            "Authority impersonation combined with fear or legal threats"
+        );
+
+    }
+
+
+    if (
+        categories.has("threat") &&
+        categories.has("urgency")
+    ) {
+
+        riskScore += 20;
+
+        reasons.push(
+            "Threat combined with urgency is a strong scam indicator"
+        );
+
+    }
+
+
+    if (
+        categories.has("money") &&
+        categories.has("urgency")
+    ) {
+
+        riskScore += 15;
+
+        reasons.push(
+            "Urgent demand for money detected"
+        );
+
+    }
+
+
+    if (categories.size >= 3) {
+
+        riskScore += 15;
+
+        reasons.push(
+            "Multiple independent phishing indicators detected"
+        );
+
+    }
+
+
+    // ==================================================
+    // FINAL SCORE
+    // ==================================================
+
+    riskScore = Math.min(
+        Math.round(riskScore),
+        100
+    );
+
+
+    let riskLevel;
+    let recommendedAction;
+    let prediction;
+
+
+    if (riskScore >= 70) {
+
+        riskLevel = "HIGH";
+
+        prediction =
+            "Phishing / Scam Detected";
+
+        recommendedAction =
+            "HIGH RISK: Do not click links, call unknown numbers, share OTP, PIN, CVV, passwords, card details or banking information. Do not send money. Verify the sender independently using an official source.";
+
+    }
+    else if (riskScore >= 35) {
+
+        riskLevel = "MEDIUM";
+
+        prediction =
+            "Suspicious Message";
+
+        recommendedAction =
+            "Possible phishing indicators detected. Do not share sensitive information or click suspicious links until the sender is independently verified.";
+
+    }
+    else {
+
+        riskLevel = "LOW";
+
+        prediction =
+            "Safe / Low Risk";
+
+        recommendedAction =
+            "No strong phishing pattern was detected. Continue to remain cautious with unknown messages.";
+
+    }
+
+
+    if (reasons.length === 0) {
+
+        reasons.push(
+            "No strong suspicious patterns detected"
+        );
+
+    }
+
+
+    return {
+
+        riskScore,
+        riskLevel,
+        prediction,
+        reasons,
+        recommendedAction
+
+    };
+
+};
+
+
+// ======================================================
+// ANALYZE PHISHING MESSAGE
+// ======================================================
+
 const analyzePhishing = async (req, res) => {
 
     try {
@@ -9,13 +441,13 @@ const analyzePhishing = async (req, res) => {
             req.body
         );
 
-        console.log(
-            "LOGGED-IN USER:",
-            req.user
-        );
-
 
         const { text } = req.body;
+
+
+        // ==================================================
+        // VALIDATION
+        // ==================================================
 
         if (
             !text ||
@@ -27,13 +459,18 @@ const analyzePhishing = async (req, res) => {
 
                 success: false,
 
-                message: "Text is required"
+                message:
+                    "Text is required"
 
             });
 
         }
 
-        if (!req.user || !req.user.id) {
+
+        if (
+            !req.user ||
+            !req.user.id
+        ) {
 
             return res.status(401).json({
 
@@ -47,305 +484,33 @@ const analyzePhishing = async (req, res) => {
         }
 
 
-        const lowerText =
-            text.toLowerCase().trim();
+        // ==================================================
+        // ANALYZE
+        // ==================================================
 
-        const suspiciousPatterns = [
-
-            {
-                keywords: [
-                    "otp",
-                    "one time password",
-                    "share otp",
-                    "tell me otp"
-                ],
-
-                reason:
-                    "Request for OTP detected",
-
-                score: 25
-            },
-
-            {
-                keywords: [
-                    "cvv",
-                    "cvv number",
-                    "card cvv"
-                ],
-
-                reason:
-                    "Request for CVV detected",
-
-                score: 20
-            },
-
-            {
-                keywords: [
-                    "atm pin",
-                    "upi pin",
-                    "share pin",
-                    "tell me your pin"
-                ],
-
-                reason:
-                    "Request for PIN detected",
-
-                score: 25
-            },
-
-            {
-                keywords: [
-                    "share your password",
-                    "tell me your password",
-                    "login password"
-                ],
-
-                reason:
-                    "Request for password detected",
-
-                score: 20
-            },
-
-            {
-                keywords: [
-                    "account blocked",
-                    "account suspended",
-                    "account will be blocked",
-                    "account will be suspended",
-                    "permanently suspended"
-                ],
-
-                reason:
-                    "Account blocking or suspension threat detected",
-
-                score: 20
-            },
-
-            {
-                keywords: [
-                    "urgent",
-                    "immediately",
-                    "right now",
-                    "act now",
-                    "hurry",
-                    "do it now"
-                ],
-
-                reason:
-                    "Urgency or pressure tactic detected",
-
-                score: 15
-            },
-
-            {
-                keywords: [
-                    "complete kyc",
-                    "update kyc",
-                    "kyc verification",
-                    "verify your kyc"
-                ],
-
-                reason:
-                    "Suspicious KYC request detected",
-
-                score: 15
-            },
-
-            {
-                keywords: [
-                    "share your bank details",
-                    "send your bank details",
-                    "share account details",
-                    "send account details"
-                ],
-
-                reason:
-                    "Request for banking information detected",
-
-                score: 15
-            },
-
-            {
-                keywords: [
-                    "bank officer",
-                    "calling from your bank",
-                    "bank representative",
-                    "customer care executive"
-                ],
-
-                reason:
-                    "Possible bank impersonation detected",
-
-                score: 15
-            },
-
-            {
-                keywords: [
-                    "you will be arrested",
-                    "police case",
-                    "legal action",
-                    "case against you",
-                    "court case"
-                ],
-
-                reason:
-                    "Threat or fear tactic detected",
-
-                score: 20
-            },
-
-            {
-                keywords: [
-                    "send money",
-                    "transfer money",
-                    "pay immediately",
-                    "transfer amount",
-                    "make payment now"
-                ],
-
-                reason:
-                    "Suspicious money transfer request detected",
-
-                score: 20
-            },
-
-            {
-                keywords: [
-                    "claim your refund",
-                    "refund amount",
-                    "get your refund"
-                ],
-
-                reason:
-                    "Potential refund scam indicator detected",
-
-                score: 10
-            },
-
-            {
-                keywords: [
-                    "claim your prize",
-                    "you are a winner",
-                    "you have won",
-                    "lottery winner"
-                ],
-
-                reason:
-                    "Prize or lottery scam indicator detected",
-
-                score: 15
-            },
-
-            {
-                keywords: [
-                    "share your card number",
-                    "share card details",
-                    "send your card details"
-                ],
-
-                reason:
-                    "Request for card information detected",
-
-                score: 15
-            }
-
-        ];
-
-        let riskScore = 0;
-
-        const reasons = [];
+        const analysis =
+            analyzeMessage(text);
 
 
-        for (
-            const pattern
-            of suspiciousPatterns
-        ) {
-
-            const foundKeyword =
-                pattern.keywords.find(
-                    (keyword) =>
-                        lowerText.includes(keyword)
-                );
-
-
-            if (foundKeyword) {
-
-                riskScore +=
-                    pattern.score;
-
-                reasons.push(
-                    pattern.reason
-                );
-
-            }
-
-        }
-
-        riskScore = Math.min(
-            riskScore,
-            100
+        console.log(
+            "PHISHING SCORE:",
+            analysis.riskScore
         );
 
-        let riskLevel;
+        console.log(
+            "PHISHING LEVEL:",
+            analysis.riskLevel
+        );
 
-        let recommendedAction;
-
-
-        if (riskScore >= 60) {
-
-            riskLevel = "HIGH";
-
-            recommendedAction =
-                "Do not share OTP, PIN, CVV, password, card or banking information. Do not send money. Verify the sender independently.";
-
-        }
-        else if (riskScore >= 30) {
-
-            riskLevel = "MEDIUM";
-
-            recommendedAction =
-                "Be cautious and verify the sender through an official source before taking any action.";
-
-        }
-        else {
-
-            riskLevel = "LOW";
-
-            recommendedAction =
-                "No strong scam indicators were detected. Continue to remain cautious with unknown messages.";
-
-        }
-
-        if (reasons.length === 0) {
-
-            reasons.push(
-                "No strong suspicious patterns detected"
-            );
-
-        }
+        console.log(
+            "PHISHING REASONS:",
+            analysis.reasons
+        );
 
 
-        let prediction;
-
-
-        if (riskLevel === "HIGH") {
-
-            prediction =
-                "Phishing / Scam Detected";
-
-        }
-        else if (riskLevel === "MEDIUM") {
-
-            prediction =
-                "Suspicious Message";
-
-        }
-        else {
-
-            prediction =
-                "Safe / Low Risk";
-
-        }
+        // ==================================================
+        // SAVE DATABASE
+        // ==================================================
 
         const savedPhishing =
             await Phishing.create({
@@ -356,16 +521,24 @@ const analyzePhishing = async (req, res) => {
                 message:
                     text.trim(),
 
-                riskScore,
+                riskScore:
+                    analysis.riskScore,
 
-                riskLevel,
+                riskLevel:
+                    analysis.riskLevel,
 
-                prediction,
+                prediction:
+                    analysis.prediction,
 
                 confidence:
-                    riskScore
+                    analysis.riskScore
 
             });
+
+
+        // ==================================================
+        // RESPONSE
+        // ==================================================
 
         return res.status(200).json({
 
@@ -377,13 +550,31 @@ const analyzePhishing = async (req, res) => {
             id:
                 savedPhishing._id,
 
-            riskScore,
+            // Main fields
+            riskScore:
+                analysis.riskScore,
 
-            riskLevel,
+            riskLevel:
+                analysis.riskLevel,
 
-            reasons,
+            prediction:
+                analysis.prediction,
 
-            recommendedAction
+            confidence:
+                analysis.riskScore,
+
+            reasons:
+                analysis.reasons,
+
+            recommendedAction:
+                analysis.recommendedAction,
+
+            // Compatibility fields
+            risk_score:
+                analysis.riskScore,
+
+            risk_level:
+                analysis.riskLevel
 
         });
 
@@ -418,4 +609,3 @@ module.exports = {
     analyzePhishing
 
 };
-

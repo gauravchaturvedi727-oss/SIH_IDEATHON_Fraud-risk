@@ -1,187 +1,435 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap");
+
+/* ==========================================================================
+   FRAUDGUARD AI / DHANRAKSHAK — UNIFIED GLOBAL DESIGN SYSTEM
+   Matrix Cyber-Green Architecture & 60FPS Quantum Glassmorphism
+========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 :root {
-    --bg: #07111f;
-    --bg-secondary: #0b1628;
+  /* Core Matrix Cyber-Green Energy Palette */
+  --cyber-core: #ffffff;
+  --cyber-green: #00ff88;
+  --cyber-emerald: #10b981;
+  --cyber-mint: #00f5a0;
+  --cyber-glow: #00ff66;
+  --cyber-darkgreen: #031c0e;
 
-    --card: rgba(15, 29, 50, 0.88);
-    --card-solid: #0f1d32;
+  /* Quantum Deep Void Backgrounds */
+  --bg-abyss: #010804;
+  --bg-deep: #020d06;
+  --bg-secondary: #04180d;
 
-    --border: rgba(148, 163, 184, 0.16);
+  /* Glassmorphic Surfaces */
+  --surface: rgba(4, 20, 10, 0.55);
+  --surface-light: rgba(6, 28, 14, 0.65);
+  --card: rgba(3, 16, 8, 0.65);
+  --card-solid: #031c0e;
+  --card-hover: rgba(5, 32, 16, 0.85);
 
-    --text: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+  /* Cyber Borders */
+  --border: rgba(0, 255, 136, 0.3);
+  --border-light: rgba(0, 255, 136, 0.45);
+  --border-dim: rgba(255, 255, 255, 0.08);
 
-    --primary: #3b82f6;
-    --primary-hover: #2563eb;
-    --cyan: #22d3ee;
+  /* Typography */
+  --text: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
 
-    --success: #22c55e;
-    --warning: #f59e0b;
-    --danger: #ef4444;
+  /* Severity Spectrum */
+  --success: #00ff88;
+  --success-bright: #00f5a0;
+  --warning: #ffbb00;
+  --danger: #ff3366;
+  --info: #00e5ff;
 
-    --shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  /* Glowing Shadows */
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.3);
+  --shadow: 0 15px 45px rgba(0, 0, 0, 0.65);
+  --shadow-lg: 0 25px 70px rgba(0, 0, 0, 0.85);
+  --glow-green: 0 0 25px rgba(0, 255, 136, 0.35);
+  --glow-green-lg: 0 0 45px rgba(0, 255, 136, 0.2);
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-full: 9999px;
+
+  /* Typography Stacks */
+  --font-main: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
 }
 
+/* ==========================================================================
+   HTML & BODY SETUP (STRICT NO-HORIZONTAL OVERFLOW)
+========================================================================== */
+
 html {
-    scroll-behavior: smooth;
+  scroll-behavior: smooth;
+  background-color: var(--bg-abyss);
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 body {
-    min-width: 320px;
-    min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
 
-    font-family: "Inter", Arial, sans-serif;
+  font-family: var(--font-main);
+  color: var(--text);
+  background-color: var(--bg-abyss);
 
-    background:
-        radial-gradient(
-            circle at top left,
-            rgba(37, 99, 235, 0.14),
-            transparent 30%
-        ),
-        radial-gradient(
-            circle at bottom right,
-            rgba(34, 211, 238, 0.08),
-            transparent 28%
-        ),
-        var(--bg);
+  background-image:
+    radial-gradient(circle at 10% 0%, rgba(0, 255, 136, 0.12), transparent 28%),
+    radial-gradient(circle at 90% 10%, rgba(0, 245, 160, 0.08), transparent 25%),
+    radial-gradient(circle at 50% 100%, rgba(16, 185, 129, 0.08), transparent 32%),
+    linear-gradient(135deg, #010804 0%, #031409 45%, #010603 100%);
+  background-attachment: fixed;
 
-    color: var(--text);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* ==========================================================================
+   MATRIX CYBER GRID & AMBIENT GLOW
+========================================================================== */
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: -2;
+  opacity: 0.35;
+
+  background-image:
+    linear-gradient(rgba(0, 255, 136, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 136, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+
+  mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+}
+
+/* Ambient Floating Plasma Nebulas */
+body::after {
+  content: "";
+  position: fixed;
+  width: 520px;
+  height: 520px;
+  top: -200px;
+  right: -150px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(circle, rgba(0, 255, 136, 0.08), transparent 68%);
+  animation: ambientFloat 14s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes ambientFloat {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(-100px, 100px, 0) scale(1.15);
+  }
+}
+
+/* ==========================================================================
+   FORM ELEMENTS & MICRO-INTERACTIONS
+========================================================================== */
 
 button,
 input,
-textarea {
-    font-family: inherit;
+textarea,
+select {
+  font-family: inherit;
+  color: inherit;
 }
 
 button {
-    transition:
-        transform 0.2s ease,
-        opacity 0.2s ease,
-        background 0.2s ease;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background: transparent;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              background 0.25s ease,
+              border-color 0.25s ease;
+  will-change: transform;
 }
 
 button:hover:not(:disabled) {
-    transform: translateY(-1px);
+  transform: translate3d(0, -2px, 0);
+}
+
+button:active:not(:disabled) {
+  transform: translate3d(0, 0, 0);
 }
 
 button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+  opacity: 0.55;
+  cursor: not-allowed;
 }
+
+input,
+textarea,
+select {
+  outline: none;
+  border: none;
+}
+
+/* Text Selection Glow */
+::selection {
+  background: rgba(0, 255, 136, 0.3);
+  color: #ffffff;
+  text-shadow: 0 0 8px var(--cyber-green);
+}
+
+/* ==========================================================================
+   LINKS
+========================================================================== */
 
 a {
-    text-decoration: none;
-    color: inherit;
+  text-decoration: none;
+  color: inherit;
+  transition: color 0.2s ease, transform 0.2s ease, text-shadow 0.2s ease;
 }
 
+/* ==========================================================================
+   CYBER GREEN SCROLLBAR
+========================================================================== */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #010804;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--cyber-green), var(--cyber-emerald));
+  border-radius: 9999px;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #ffffff, var(--cyber-mint));
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cyber-green) #010804;
+}
+
+/* ==========================================================================
+   REACT-TOASTIFY — MATRIX CYBERSECURITY ALERT SYSTEM
+========================================================================== */
 
 .Toastify__toast-container {
-    z-index: 9999;
+  z-index: 999999;
+  padding: 1rem;
+  max-width: 440px;
 }
 
-
+/* Main Base Toast Card */
 .Toastify__toast {
-    background: rgba(8, 24, 39, 0.98) !important;
-
-    color: #ffffff !important;
-
-    border: 1px solid rgba(80, 160, 255, 0.2);
-
-    border-radius: 14px !important;
-
-    box-shadow:
-        0 15px 40px rgba(0, 0, 0, 0.45);
-
-    backdrop-filter: blur(12px);
-
-    font-family: inherit;
+  position: relative;
+  min-height: 68px;
+  padding: 1rem 1.25rem;
+  color: var(--text) !important;
+  background: linear-gradient(135deg, rgba(4, 24, 12, 0.95), rgba(2, 12, 6, 0.98)) !important;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8),
+              0 0 25px rgba(0, 255, 136, 0.15),
+              inset 0 0 15px rgba(0, 255, 136, 0.04) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  overflow: hidden;
+  font-family: var(--font-main);
+  margin-bottom: 0.85rem;
 }
 
+/* Top Laser Line on Toast */
+.Toastify__toast::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyber-green), var(--cyber-mint), transparent);
+  opacity: 0.85;
+}
+
+/* Toast Body */
 .Toastify__toast-body {
-    color: #dce9f5 !important;
-
-    font-size: 14px;
+  margin: 0 !important;
+  padding: 0 8px 0 4px;
+  color: #e2e8f0 !important;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
+.Toastify__toast-icon {
+  width: 22px;
+  margin-right: 12px;
+}
+
+/* --------------------------------------------------------------------------
+   SUCCESS TOAST
+   -------------------------------------------------------------------------- */
 .Toastify__toast--success {
-    border-left: 4px solid #20d6a5 !important;
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(8, 35, 45, 0.98),
-            rgba(8, 24, 39, 0.98)
-        ) !important;
+  border-left: 4px solid var(--success) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8),
+              -8px 0 25px rgba(0, 255, 136, 0.2) !important;
 }
 
+.Toastify__toast--success::before {
+  background: linear-gradient(90deg, transparent, var(--success), var(--success-bright), transparent);
+}
+
+/* --------------------------------------------------------------------------
+   ERROR TOAST
+   -------------------------------------------------------------------------- */
 .Toastify__toast--error {
-    border-left: 4px solid #ff5c6c !important;
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(48, 15, 25, 0.98),
-            rgba(8, 24, 39, 0.98)
-        ) !important;
+  border-left: 4px solid var(--danger) !important;
+  background: linear-gradient(135deg, rgba(35, 8, 14, 0.95), rgba(16, 4, 8, 0.98)) !important;
+  border-color: rgba(255, 51, 102, 0.3) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8),
+              -8px 0 25px rgba(255, 51, 102, 0.25) !important;
 }
 
+.Toastify__toast--error::before {
+  background: linear-gradient(90deg, transparent, #ff3366, #ff7799, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   WARNING TOAST
+   -------------------------------------------------------------------------- */
 .Toastify__toast--warning {
-    border-left: 4px solid #ffb020 !important;
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(48, 35, 12, 0.98),
-            rgba(8, 24, 39, 0.98)
-        ) !important;
+  border-left: 4px solid var(--warning) !important;
+  background: linear-gradient(135deg, rgba(35, 26, 6, 0.95), rgba(18, 14, 3, 0.98)) !important;
+  border-color: rgba(255, 187, 0, 0.3) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8),
+              -8px 0 25px rgba(255, 187, 0, 0.2) !important;
 }
 
+.Toastify__toast--warning::before {
+  background: linear-gradient(90deg, transparent, #ffbb00, #ffe066, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   INFO TOAST
+   -------------------------------------------------------------------------- */
 .Toastify__toast--info {
-    border-left: 4px solid #2495ff !important;
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(8, 35, 65, 0.98),
-            rgba(8, 24, 39, 0.98)
-        ) !important;
+  border-left: 4px solid var(--info) !important;
+  background: linear-gradient(135deg, rgba(4, 25, 35, 0.95), rgba(2, 14, 20, 0.98)) !important;
+  border-color: rgba(0, 229, 255, 0.3) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8),
+              -8px 0 25px rgba(0, 229, 255, 0.2) !important;
 }
 
+.Toastify__toast--info::before {
+  background: linear-gradient(90deg, transparent, #00e5ff, #80f2ff, transparent);
+}
+
+/* Close Button */
 .Toastify__close-button {
-    color: #8fa5ba !important;
-
-    opacity: 1 !important;
+  color: var(--text-dim) !important;
+  opacity: 0.8 !important;
+  align-self: center;
+  transition: color 0.2s ease, transform 0.2s ease;
 }
-
 
 .Toastify__close-button:hover {
-    color: white !important;
+  color: #ffffff !important;
+  transform: rotate(90deg) scale(1.1);
 }
 
+/* Progress Track */
 .Toastify__progress-bar {
-    background:
-        linear-gradient(
-            90deg,
-            #087cff,
-            #00baff
-        ) !important;
-}
-
-.Toastify__toast--success .Toastify__progress-bar {
-    background: #20d6a5 !important;
+  height: 3px;
+  background: linear-gradient(90deg, var(--cyber-green), var(--cyber-mint)) !important;
 }
 
 .Toastify__toast--error .Toastify__progress-bar {
-    background: #ff5c6c !important;
+  background: linear-gradient(90deg, #ff3366, #ff7799) !important;
 }
+
 .Toastify__toast--warning .Toastify__progress-bar {
-    background: #ffb020 !important;
+  background: linear-gradient(90deg, #ffbb00, #ffe066) !important;
+}
+
+.Toastify__toast--info .Toastify__progress-bar {
+  background: linear-gradient(90deg, #00e5ff, #80f2ff) !important;
+}
+
+/* ==========================================================================
+   RESPONSIVE OVERFLOW SAFEGUARDS
+========================================================================== */
+
+@media (max-width: 600px) {
+  body::before {
+    background-size: 36px 36px;
+    opacity: 0.2;
+  }
+
+  body::after {
+    width: 280px;
+    height: 280px;
+  }
+
+  .Toastify__toast-container {
+    padding: 0.5rem;
+    max-width: 100vw;
+  }
+
+  .Toastify__toast {
+    border-radius: var(--radius-sm) !important;
+    min-height: 60px;
+    padding: 0.85rem 1rem;
+  }
+
+  .Toastify__toast-body {
+    font-size: 0.82rem;
+  }
+}
+
+/* ==========================================================================
+   PERFORMANCE + ACCESSIBILITY
+========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
