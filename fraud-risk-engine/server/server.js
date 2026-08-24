@@ -14,18 +14,36 @@ const notificationRoutes = require("./routes/notificationRoutes");
 
 const app = express();
 
+
 connectDB();
 
+const allowedOrigins = [
+    "https://sih-ideathon-fraud-risk.vercel.app",
+    "http://localhost:5173"
+];
 
-// =====================================
-// CORS - MUST BE BEFORE ALL ROUTES
-// =====================================
 
 app.use(cors({
-    origin: [
-        "https://sih-ideathon.vercel.app",
-        "http://localhost:5173"
-    ],
+    origin: (origin, callback) => {
+
+        // Allow requests without Origin
+        // Example: Postman / server-to-server
+        if (!origin) {
+            return callback(null, true);
+        }
+
+        // Allow known frontend URLs
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        console.log("❌ CORS blocked:", origin);
+
+        return callback(
+            new Error("Not allowed by CORS")
+        );
+    },
+
     methods: [
         "GET",
         "POST",
@@ -34,35 +52,43 @@ app.use(cors({
         "DELETE",
         "OPTIONS"
     ],
+
     allowedHeaders: [
         "Content-Type",
         "Authorization"
-    ]
+    ],
+
+    credentials: true
 }));
-
-
-// =====================================
-// BODY PARSER
-// =====================================
 
 app.use(express.json());
 
+app.use(express.urlencoded({
+    extended: true
+}));
 
-// =====================================
-// TEST ROUTE
-// =====================================
 
 app.get("/", (req, res) => {
-    res.json({
+
+    res.status(200).json({
         success: true,
-        message: "FraudGuard API is running"
+        message: "DhanRakshak Fraud Detection API is running 🚀",
+        environment: process.env.NODE_ENV || "development"
     });
+
 });
 
 
-// =====================================
-// API ROUTES
-// =====================================
+app.get("/health", (req, res) => {
+
+    res.status(200).json({
+        success: true,
+        status: "healthy",
+        service: "DhanRakshak Backend"
+    });
+
+});
+
 
 app.use("/api/auth", authRoutes);
 
@@ -77,28 +103,38 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/notifications", notificationRoutes);
 
 
-// =====================================
-// ERROR HANDLER
-// =====================================
+app.use((req, res) => {
+
+    res.status(404).json({
+        success: false,
+        message: `Route not found: ${req.method} ${req.originalUrl}`
+    });
+
+});
 
 app.use((err, req, res, next) => {
 
-    console.error("SERVER ERROR:", err);
+    console.error("❌ SERVER ERROR:", err.message);
 
-    res.status(500).json({
+    res.status(err.status || 500).json({
         success: false,
         message: err.message || "Internal Server Error"
     });
 
 });
 
-
-// =====================================
-// SERVER
-// =====================================
-
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+
+    console.log("\n=====================================");
+    console.log("🚀 DhanRakshak Backend Running");
+    console.log(`📡 Port: ${PORT}`);
+    console.log(
+        `🌍 Environment: ${
+            process.env.NODE_ENV || "development"
+        }`
+    );
+    console.log("=====================================\n");
+
 });
