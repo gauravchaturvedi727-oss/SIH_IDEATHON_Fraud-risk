@@ -11,7 +11,6 @@ function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Handle scroll detection for dynamic glassmorphism
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 20) {
@@ -25,12 +24,11 @@ function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Close mobile drawer on route change
+  
   useEffect(() => {
     setMenuOpen(false);
   }, [location]);
 
-  // Handle outside click to close drawer
   useEffect(() => {
     const handleOutsideClick = (e) => {
       if (navRef.current && !navRef.current.contains(e.target)) {
@@ -47,7 +45,7 @@ function Navbar() {
     if (menuOpen) {
       document.addEventListener("mousedown", handleOutsideClick);
       document.addEventListener("keydown", handleEscape);
-      document.body.style.overflow = "hidden"; // Lock scroll on mobile
+      document.body.style.overflow = "hidden"; 
     } else {
       document.body.style.overflow = "unset";
     }
@@ -73,7 +71,6 @@ function Navbar() {
     <header className={`navbar-header ${scrolled ? "scrolled" : ""}`} ref={navRef}>
       <div className="navbar-container">
         
-        {/* Brand Logo & Live Radar */}
         <div className="navbar-brand-group">
           <NavLink to="/" end className="navbar-logo" onClick={closeMenu}>
             <div className="logo-shield-badge">
@@ -81,7 +78,7 @@ function Navbar() {
               <span className="logo-pulse"></span>
             </div>
             <div className="logo-text-group">
-              <span className="logo-text">FraudGuard</span>
+              <span className="logo-text">DhanRakshak</span>
               <span className="logo-subtext">AI DEFENSE HUD</span>
             </div>
           </NavLink>
@@ -92,10 +89,10 @@ function Navbar() {
           </div>
         </div>
 
-        {/* Right Section: Notification, Links & Mobile Toggle */}
+     
         <div className="navbar-actions-wrapper">
           
-          {/* Main Navigation Links */}
+  
           <nav 
             className={`navbar-links ${menuOpen ? "menu-open" : ""}`} 
             id="primary-navigation"
@@ -153,7 +150,7 @@ function Navbar() {
             </div>
           </nav>
 
-          {/* Persistent Right Section: Notifications & Menu Toggle */}
+      
           <div className="navbar-utilities">
             <NotificationCenter />
 
@@ -173,7 +170,7 @@ function Navbar() {
 
       </div>
 
-      {/* Mobile Backdrop Overlay */}
+   
       {menuOpen && <div className="mobile-backdrop" onClick={closeMenu}></div>}
     </header>
   );
