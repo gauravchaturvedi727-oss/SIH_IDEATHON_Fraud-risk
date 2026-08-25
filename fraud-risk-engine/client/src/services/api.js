@@ -20,8 +20,4 @@ api.interceptors.request.use(
     }
 );
 
-<<<<<<< HEAD
 export default api;
-=======
-export default api;
->>>>>>> eab2da171b4154f0bbd7e563ac01f71fbeae78d3

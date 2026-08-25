@@ -18,13 +18,9 @@ function Register() {
 
   const [loading, setLoading] = useState(false);
 
-<<<<<<< HEAD
-
-=======
-  // Show / Hide Password
->>>>>>> eab2da171b4154f0bbd7e563ac01f71fbeae78d3
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -43,11 +39,7 @@ function Register() {
     }, 1800);
   };
 
-<<<<<<< HEAD
-  
-=======
   // Password validation
->>>>>>> eab2da171b4154f0bbd7e563ac01f71fbeae78d3
   const validatePassword = (password) => {
     if (password.length < 8) {
       return "Password must contain at least 8 characters";
@@ -119,11 +111,7 @@ function Register() {
       <div className="register-glow register-glow-one"></div>
       <div className="register-glow register-glow-two"></div>
 
-<<<<<<< HEAD
-   
-=======
       {/* STAGE 1 */}
->>>>>>> eab2da171b4154f0bbd7e563ac01f71fbeae78d3
       {stage === "welcome" && (
         <section className="welcome-portal">
 
@@ -154,12 +142,10 @@ function Register() {
         </section>
       )}
 
-<<<<<<< HEAD
-=======
       {/* STAGE 2 */}
->>>>>>> eab2da171b4154f0bbd7e563ac01f71fbeae78d3
       {stage === "unlocking" && (
         <div className="unlock-scanner-overlay">
+
           <div className="scanner-reticle"></div>
 
           <h2>
@@ -169,22 +155,15 @@ function Register() {
           <p>
             SCANNING IDENTITY CODES & SECURING PROTOCOLS...
           </p>
+
         </div>
       )}
 
-<<<<<<< HEAD
-
-      {stage === "registered_view" && (
-        <div className="register-container">
-
-
-=======
       {/* STAGE 3 */}
       {stage === "registered_view" && (
         <div className="register-container">
 
           {/* LEFT PANEL */}
->>>>>>> eab2da171b4154f0bbd7e563ac01f71fbeae78d3
           <section className="register-info">
 
             <div className="register-logo">
@@ -203,33 +182,43 @@ function Register() {
               </h1>
 
               <p>
-                Join the quantum security grid. Protect your transactions,
-                detect voice scams, and prevent phishing with intelligent AI.
+                Join the quantum security grid. Protect your
+                transactions, detect voice scams, and prevent
+                phishing with intelligent AI.
               </p>
 
               <div className="security-features">
 
                 <div className="security-feature">
                   <span>💳</span>
+
                   <div>
                     <strong>Transaction Sentinel</strong>
-                    <p>Real-time payment fraud prevention.</p>
+                    <p>
+                      Real-time payment fraud prevention.
+                    </p>
                   </div>
                 </div>
 
                 <div className="security-feature">
                   <span>📩</span>
+
                   <div>
                     <strong>Phishing Shield</strong>
-                    <p>Scans SMS, emails & suspicious URLs.</p>
+                    <p>
+                      Scans SMS, emails & suspicious URLs.
+                    </p>
                   </div>
                 </div>
 
                 <div className="security-feature">
                   <span>🎙️</span>
+
                   <div>
                     <strong>Voice AI Scanner</strong>
-                    <p>Detects fraudulent scam call patterns.</p>
+                    <p>
+                      Detects fraudulent scam call patterns.
+                    </p>
                   </div>
                 </div>
 
@@ -243,10 +232,7 @@ function Register() {
 
           </section>
 
-<<<<<<< HEAD
-=======
           {/* RIGHT PANEL */}
->>>>>>> eab2da171b4154f0bbd7e563ac01f71fbeae78d3
           <section className="register-card">
 
             <div className="register-card-header">
@@ -258,23 +244,21 @@ function Register() {
               <h2>Create Security Account</h2>
 
               <p>
-                Enter your details to initiate your DhanRakshak identity.
+                Enter your details to initiate your
+                DhanRakshak identity.
               </p>
 
             </div>
 
             <form onSubmit={handleSubmit}>
 
-<<<<<<< HEAD
-    
-=======
               {/* NAME */}
->>>>>>> eab2da171b4154f0bbd7e563ac01f71fbeae78d3
               <div className="register-input-group">
 
                 <label>Full Name</label>
 
                 <div className="register-input">
+
                   <span>👤</span>
 
                   <input
@@ -285,20 +269,18 @@ function Register() {
                     onChange={handleChange}
                     required
                   />
+
                 </div>
 
               </div>
 
-<<<<<<< HEAD
-
-=======
               {/* EMAIL */}
->>>>>>> eab2da171b4154f0bbd7e563ac01f71fbeae78d3
               <div className="register-input-group">
 
                 <label>Email Address</label>
 
                 <div className="register-input">
+
                   <span>✉️</span>
 
                   <input
@@ -309,6 +291,7 @@ function Register() {
                     onChange={handleChange}
                     required
                   />
+
                 </div>
 
               </div>
@@ -409,6 +392,7 @@ function Register() {
             </form>
 
             <div className="register-bottom">
+
               <p>
                 Already protected by DhanRakshak?
 
@@ -418,7 +402,9 @@ function Register() {
                 >
                   Sign In
                 </Link>
+
               </p>
+
             </div>
 
             <div className="register-secure">
