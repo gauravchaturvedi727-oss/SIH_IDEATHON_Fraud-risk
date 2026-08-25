@@ -549,7 +549,7 @@ function NotificationCenter() {
 
                     <div className="notification-footer">
 
-                        🛡️ FraudGuard AI Monitoring Active
+                        🛡️ DhanRakshak AI Monitoring Active
 
                     </div>
 
