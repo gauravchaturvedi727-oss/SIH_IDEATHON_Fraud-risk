@@ -875,7 +875,7 @@ function Transaction() {
 
                 <span className="status-indicator"></span>
 
-                FRAUDGUARD AI LIVE MONITOR
+                DhanRakshak AI LIVE MONITOR
 
                 <span className="live-pill">
 
