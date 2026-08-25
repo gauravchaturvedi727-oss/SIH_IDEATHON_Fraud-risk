@@ -25,7 +25,6 @@ const getMLUrl = () => {
 
 // ==========================================
 // CONVERT VALUE TO BOOLEAN
-// Handles true, false, "true", "false", 1, 0
 // ==========================================
 
 const toBoolean = (value) => {
@@ -36,10 +35,39 @@ const toBoolean = (value) => {
         value === 1 ||
         value === "1"
     ) {
+
         return true;
+
     }
 
     return false;
+
+};
+
+
+// ==========================================
+// VALIDATE UPI ID
+// ==========================================
+
+const isValidUPIId = (upiId) => {
+
+    if (!upiId) {
+
+        return false;
+
+    }
+
+    // Example:
+    // name@upi
+    // user@ybl
+    // 9876543210@paytm
+
+    const upiRegex =
+        /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/;
+
+    return upiRegex.test(
+        String(upiId).trim()
+    );
 
 };
 
@@ -52,12 +80,18 @@ const validateTransactionData = (data) => {
 
     const amount = Number(data.amount);
 
+    const recipientUPI =
+        String(
+            data.recipientUPI || ""
+        ).trim().toLowerCase();
+
+
     if (
         data.amount === undefined ||
         data.amount === null ||
         data.amount === "" ||
         Number.isNaN(amount) ||
-        amount < 0
+        amount <= 0
     ) {
 
         throw new Error(
@@ -66,9 +100,28 @@ const validateTransactionData = (data) => {
 
     }
 
+
+    if (
+        !isValidUPIId(recipientUPI)
+    ) {
+
+        throw new Error(
+            "Valid recipient UPI ID is required"
+        );
+
+    }
+
+
     return {
 
         amount,
+
+        recipientUPI,
+
+        recipientName:
+            String(
+                data.recipientName || ""
+            ).trim(),
 
         newDevice:
             toBoolean(data.newDevice),
@@ -77,15 +130,64 @@ const validateTransactionData = (data) => {
             toBoolean(data.newLocation),
 
         rapidTransactions:
-            toBoolean(data.rapidTransactions),
+            Math.max(
+                0,
+                Number(data.rapidTransactions) || 0
+            ),
 
         failedLogins:
-            toBoolean(data.failedLogins),
+            Math.max(
+                0,
+                Number(data.failedLogins) || 0
+            ),
 
         otpRequests:
-            toBoolean(data.otpRequests)
+            Math.max(
+                0,
+                Number(data.otpRequests) || 0
+            ),
+
+        coercionDetected:
+            toBoolean(
+                data.coercionDetected
+            ),
+
+        voicePhishingDetected:
+            toBoolean(
+                data.voicePhishingDetected
+            ),
+
+        urgentPayment:
+            toBoolean(
+                data.urgentPayment
+            )
 
     };
+
+};
+// ==========================================
+// CHECK IF BENEFICIARY IS NEW
+// ==========================================
+
+const checkNewBeneficiary = async (
+    userId,
+    recipientUPI
+) => {
+
+    const previousTransaction =
+        await Transaction.findOne({
+
+            user: userId,
+
+            recipientUPI
+
+        });
+
+
+    // If no previous transaction exists,
+    // beneficiary is new
+
+    return !previousTransaction;
 
 };
 
@@ -94,9 +196,12 @@ const validateTransactionData = (data) => {
 // ANALYZE WITH ML SERVICE
 // ==========================================
 
-const analyzeWithML = async (data) => {
+const analyzeWithML = async (
+    data
+) => {
 
     const mlUrl = getMLUrl();
+
 
     console.log(
         "SENDING TRANSACTION TO ML:",
@@ -104,26 +209,27 @@ const analyzeWithML = async (data) => {
     );
 
 
-    const mlResponse = await axios.post(
+    const mlResponse =
+        await axios.post(
 
-        mlUrl,
+            mlUrl,
 
-        data,
+            data,
 
-        {
+            {
 
-            timeout: 300000,
+                timeout: 300000,
 
-            headers: {
+                headers: {
 
-                "Content-Type":
-                    "application/json"
+                    "Content-Type":
+                        "application/json"
+
+                }
 
             }
 
-        }
-
-    );
+        );
 
 
     console.log(
@@ -132,7 +238,8 @@ const analyzeWithML = async (data) => {
     );
 
 
-    const mlData = mlResponse.data;
+    const mlData =
+        mlResponse.data;
 
 
     // ======================================
@@ -140,8 +247,8 @@ const analyzeWithML = async (data) => {
     // ======================================
 
     if (
-        typeof mlData.riskScore === "undefined" ||
-        !mlData.riskLevel
+        typeof mlData.riskScore ===
+        "undefined"
     ) {
 
         throw new Error(
@@ -154,7 +261,9 @@ const analyzeWithML = async (data) => {
     return {
 
         riskScore:
-            Number(mlData.riskScore) || 0,
+            Number(
+                mlData.riskScore
+            ) || 0,
 
         riskLevel:
             String(
@@ -166,10 +275,16 @@ const analyzeWithML = async (data) => {
             "Verify the transaction before proceeding.",
 
         mlProbability:
-            Number(mlData.mlProbability) || 0,
-
+            Number(
+                mlData.mlProbability ??
+                mlData.fraudProbability ??
+                mlData.fraud_probability ??
+                0
+            ) || 0,
         reasons:
-            Array.isArray(mlData.reasons)
+            Array.isArray(
+                mlData.reasons
+            )
                 ? mlData.reasons
                 : []
 
@@ -179,7 +294,244 @@ const analyzeWithML = async (data) => {
 
 
 // ==========================================
-// CREATE TRANSACTION
+// ADD EXPLAINABLE UPI RISK REASONS
+// ==========================================
+
+const addUPIReasons = (
+    data,
+    mlResult
+) => {
+
+    const reasons =
+        [...mlResult.reasons];
+
+
+    // ======================================
+    // NEW BENEFICIARY
+    // ======================================
+
+    if (data.isNewBeneficiary) {
+
+        reasons.push(
+            "This is the first payment to this UPI recipient."
+        );
+
+    }
+
+
+    // ======================================
+    // NEW DEVICE
+    // ======================================
+
+    if (data.newDevice) {
+
+        reasons.push(
+            "The payment is being initiated from a new device."
+        );
+
+    }
+
+
+    // ======================================
+    // NEW LOCATION
+    // ======================================
+
+    if (data.newLocation) {
+
+        reasons.push(
+            "The payment location is different from your usual activity."
+        );
+
+    }
+
+
+    // ======================================
+    // RAPID TRANSACTIONS
+    // ======================================
+
+    if (data.rapidTransactions) {
+
+        reasons.push(
+            "Multiple transactions were detected in a short period."
+        );
+
+    }
+
+
+    // ======================================
+    // FAILED LOGINS
+    // ======================================
+
+    if (data.failedLogins) {
+
+        reasons.push(
+            "Recent failed login attempts were detected."
+        );
+
+    }
+
+
+    // ======================================
+    // OTP ACTIVITY
+    // ======================================
+
+    if (data.otpRequests) {
+
+        reasons.push(
+            "Unusual OTP or verification activity was detected."
+        );
+
+    }
+
+
+    // ======================================
+    // COERCION / SOCIAL ENGINEERING
+    // ======================================
+
+    if (data.coercionDetected) {
+
+        reasons.push(
+            "The payment may be influenced by pressure or social engineering."
+        );
+
+    }
+
+
+    // ======================================
+    // VOICE PHISHING
+    // ======================================
+
+    if (data.voicePhishingDetected) {
+
+        reasons.push(
+            "Possible voice phishing or scam-call indicators were detected."
+        );
+
+    }
+
+
+    // ======================================
+    // URGENCY
+    // ======================================
+
+    if (data.urgentPayment) {
+
+        reasons.push(
+            "The payment was marked as urgent, which can be associated with scam pressure tactics."
+        );
+
+    }
+
+
+    return reasons;
+
+};
+
+
+// ==========================================
+// CALCULATE FINAL RISK
+// Combines ML + UPI specific signals
+// ==========================================
+
+const calculateFinalRisk = (
+    data,
+    mlResult
+) => {
+
+    let riskScore =
+        Number(
+            mlResult.riskScore
+        ) || 0;
+
+
+    // ======================================
+    // ADDITIONAL UPI SIGNAL WEIGHTS
+    // ======================================
+
+    if (data.isNewBeneficiary) {
+
+        riskScore += 10;
+
+    }
+
+    if (data.coercionDetected) {
+
+        riskScore += 20;
+
+    }
+
+    if (data.voicePhishingDetected) {
+
+        riskScore += 25;
+
+    }
+
+    if (data.urgentPayment) {
+
+        riskScore += 10;
+
+    }
+
+
+    // Maximum risk = 100
+
+    riskScore =
+        Math.min(
+            Math.round(riskScore),
+            100
+        );
+
+
+    let riskLevel = "LOW";
+
+
+    if (riskScore >= 75) {
+
+        riskLevel = "HIGH";
+
+    }
+    else if (riskScore >= 40) {
+
+        riskLevel = "MEDIUM";
+
+    }
+
+
+    let recommendedAction =
+        "Transaction appears normal. Review recipient details before payment.";
+
+
+    if (riskLevel === "MEDIUM") {
+
+        recommendedAction =
+            "Please verify the UPI ID and ensure nobody is pressuring you to make this payment.";
+
+    }
+
+
+    if (riskLevel === "HIGH") {
+
+        recommendedAction =
+            "High fraud risk detected. Verify the recipient independently. Do not share your UPI PIN or OTP. If someone is pressuring you, cancel the payment.";
+
+    }
+
+
+    return {
+
+        riskScore,
+
+        riskLevel,
+
+        recommendedAction
+
+    };
+
+};
+
+
+// ==========================================
+// CREATE TRANSACTION / UPI PAYMENT ANALYSIS
 // ==========================================
 
 const createTransaction = async (
@@ -217,8 +569,26 @@ const createTransaction = async (
             );
 
 
+        // =====================================
+        // CHECK NEW BENEFICIARY AUTOMATICALLY
+        // =====================================
+
+        const isNewBeneficiary =
+            await checkNewBeneficiary(
+
+                req.user.id,
+
+                transactionData.recipientUPI
+
+            );
+
+
+        transactionData.isNewBeneficiary =
+            isNewBeneficiary;
+
+
         console.log(
-            "TRANSACTION DATA:",
+            "UPI TRANSACTION DATA:",
             transactionData
         );
 
@@ -234,7 +604,40 @@ const createTransaction = async (
 
 
         // =====================================
-        // SAVE TRANSACTION
+        // CALCULATE FINAL COMBINED RISK
+        // =====================================
+
+        const finalRisk =
+            calculateFinalRisk(
+
+                transactionData,
+
+                mlResult
+
+            );
+
+
+        // =====================================
+        // GENERATE EXPLAINABLE REASONS
+        // =====================================
+
+        const reasons =
+            addUPIReasons(
+
+                transactionData,
+
+                mlResult
+
+            );
+
+
+        // =====================================
+        // CREATE TRANSACTION
+        // STATUS = PENDING
+        //
+        // IMPORTANT:
+        // Payment is NOT automatically blocked.
+        // User can review and confirm.
         // =====================================
 
         const transaction =
@@ -245,7 +648,22 @@ const createTransaction = async (
 
                 ...transactionData,
 
-                ...mlResult
+                riskScore:
+                    finalRisk.riskScore,
+
+                riskLevel:
+                    finalRisk.riskLevel,
+
+                recommendedAction:
+                    finalRisk.recommendedAction,
+
+                mlProbability:
+                    mlResult.mlProbability,
+
+                reasons,
+
+                paymentStatus:
+                    "PENDING_CONFIRMATION"
 
             });
 
@@ -255,7 +673,10 @@ const createTransaction = async (
             success: true,
 
             message:
-                "Transaction analyzed successfully",
+                "UPI payment analyzed successfully. Please review the risk warning before confirming.",
+
+            requiresConfirmation:
+                true,
 
             transaction
 
@@ -265,7 +686,7 @@ const createTransaction = async (
     catch (error) {
 
         console.error(
-            "========== CREATE TRANSACTION ERROR =========="
+            "========== UPI TRANSACTION ERROR =========="
         );
 
         console.error(
@@ -284,19 +705,18 @@ const createTransaction = async (
         );
 
         console.error(
-            "CODE:",
-            error.code
-        );
-
-        console.error(
-            "=============================================="
+            "=========================================="
         );
 
 
         return res.status(
 
-            error.message.includes("required") ||
-            error.message.includes("Valid transaction")
+            error.message.includes(
+                "required"
+            ) ||
+            error.message.includes(
+                "Valid transaction"
+            )
                 ? 400
                 : 500
 
@@ -308,6 +728,208 @@ const createTransaction = async (
                 error.response?.data?.message ||
                 error.message ||
                 "Risk analysis failed"
+
+        });
+
+    }
+
+};
+
+
+// ==========================================
+// CONFIRM UPI PAYMENT
+//
+// User can proceed even if HIGH risk.
+// This satisfies:
+// "without blocking legitimate urgent payments"
+// ==========================================
+
+const confirmPayment = async (
+    req,
+    res
+) => {
+
+    try {
+
+        if (!req.user?.id) {
+
+            return res.status(401).json({
+
+                success: false,
+
+                message:
+                    "User authentication failed"
+
+            });
+
+        }
+
+
+        const transaction =
+            await Transaction.findOne({
+
+                _id:
+                    req.params.id,
+
+                user:
+                    req.user.id
+
+            });
+
+
+        if (!transaction) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message:
+                    "Transaction not found"
+
+            });
+
+        }
+
+
+        if (
+            transaction.paymentStatus ===
+            "COMPLETED"
+        ) {
+
+            return res.status(400).json({
+
+                success: false,
+
+                message:
+                    "Payment has already been completed"
+
+            });
+
+        }
+
+
+        // =====================================
+        // MOCK UPI PAYMENT SUCCESS
+        //
+        // Later actual banking/UPI API can
+        // replace this section.
+        // =====================================
+
+        transaction.paymentStatus =
+            "COMPLETED";
+
+        transaction.userConfirmed =
+            true;
+
+        transaction.confirmedAt =
+            new Date();
+
+
+        await transaction.save();
+
+
+        return res.status(200).json({
+
+            success: true,
+
+            message:
+                "UPI payment completed successfully",
+
+            transaction
+
+        });
+
+    }
+    catch (error) {
+
+        console.error(
+            "CONFIRM PAYMENT ERROR:",
+            error.message
+        );
+
+
+        return res.status(500).json({
+
+            success: false,
+
+            message:
+                "Failed to confirm payment"
+
+        });
+
+    }
+
+};
+
+
+// ==========================================
+// CANCEL UPI PAYMENT
+// ==========================================
+
+const cancelPayment = async (
+    req,
+    res
+) => {
+
+    try {
+
+        const transaction =
+            await Transaction.findOne({
+
+                _id:
+                    req.params.id,
+
+                user:
+                    req.user.id
+
+            });
+
+
+        if (!transaction) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message:
+                    "Transaction not found"
+
+            });
+
+        }
+
+
+        transaction.paymentStatus =
+            "CANCELLED";
+
+
+        await transaction.save();
+
+
+        return res.status(200).json({
+
+            success: true,
+
+            message:
+                "UPI payment cancelled successfully"
+
+        });
+
+    }
+    catch (error) {
+
+        console.error(
+            "CANCEL PAYMENT ERROR:",
+            error.message
+        );
+
+
+        return res.status(500).json({
+
+            success: false,
+
+            message:
+                "Failed to cancel payment"
 
         });
 
@@ -365,12 +987,6 @@ const getTransactions = async (
 
     }
     catch (error) {
-
-        console.error(
-            "GET TRANSACTIONS ERROR:",
-            error.message
-        );
-
 
         return res.status(500).json({
 
@@ -434,144 +1050,12 @@ const getTransactionById = async (
     }
     catch (error) {
 
-        console.error(
-            "GET TRANSACTION ERROR:",
-            error.message
-        );
-
-
         return res.status(500).json({
 
             success: false,
 
             message:
                 "Failed to fetch transaction"
-
-        });
-
-    }
-
-};
-
-
-// ==========================================
-// UPDATE TRANSACTION
-// ==========================================
-
-const updateTransaction = async (
-    req,
-    res
-) => {
-
-    try {
-
-        // =====================================
-        // CHECK TRANSACTION EXISTS
-        // =====================================
-
-        const existingTransaction =
-            await Transaction.findOne({
-
-                _id:
-                    req.params.id,
-
-                user:
-                    req.user.id
-
-            });
-
-
-        if (!existingTransaction) {
-
-            return res.status(404).json({
-
-                success: false,
-
-                message:
-                    "Transaction not found"
-
-            });
-
-        }
-
-
-        // =====================================
-        // VALIDATE UPDATED DATA
-        // =====================================
-
-        const transactionData =
-            validateTransactionData(
-                req.body
-            );
-
-
-        // =====================================
-        // RUN ML ANALYSIS AGAIN
-        // =====================================
-
-        const mlResult =
-            await analyzeWithML(
-                transactionData
-            );
-
-
-        // =====================================
-        // UPDATE DATABASE
-        // =====================================
-
-        const transaction =
-            await Transaction.findByIdAndUpdate(
-
-                req.params.id,
-
-                {
-
-                    ...transactionData,
-
-                    ...mlResult
-
-                },
-
-                {
-
-                    new: true,
-
-                    runValidators: true
-
-                }
-
-            );
-
-
-        return res.status(200).json({
-
-            success: true,
-
-            message:
-                "Transaction updated and re-analyzed successfully",
-
-            transaction
-
-        });
-
-    }
-    catch (error) {
-
-        console.error(
-            "UPDATE TRANSACTION ERROR:",
-            error.response?.data ||
-            error.message
-        );
-
-
-        return res.status(500).json({
-
-            success: false,
-
-            message:
-                error.response?.data?.message ||
-                error.message ||
-                "Failed to update transaction"
 
         });
 
@@ -629,12 +1113,6 @@ const deleteTransaction = async (
     }
     catch (error) {
 
-        console.error(
-            "DELETE TRANSACTION ERROR:",
-            error.message
-        );
-
-
         return res.status(500).json({
 
             success: false,
@@ -657,11 +1135,13 @@ module.exports = {
 
     createTransaction,
 
+    confirmPayment,
+
+    cancelPayment,
+
     getTransactions,
 
     getTransactionById,
-
-    updateTransaction,
 
     deleteTransaction
 

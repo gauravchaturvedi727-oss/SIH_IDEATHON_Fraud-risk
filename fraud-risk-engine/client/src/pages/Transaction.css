@@ -1056,3 +1056,332 @@
   }
 }
 
+
+
+/* NEW SOCIAL ENGINEERING GRID */
+
+.social-flags-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+}
+
+
+/* SMALL SECTION TITLE */
+
+.small-title {
+  margin-top: 0.4rem;
+}
+
+
+/* PAYMENT SUMMARY */
+
+.payment-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--tx-border-dim);
+}
+
+.payment-summary > span {
+  font-family: var(--font-hud);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--tx-green);
+  letter-spacing: 1px;
+}
+
+.payment-summary strong {
+  font-size: 1.1rem;
+  color: #fff;
+}
+
+.payment-summary small {
+  font-family: var(--font-hud);
+  color: #64748b;
+}
+
+.payment-summary h2 {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-hud);
+  font-size: 1.8rem;
+}
+
+
+/* PAYMENT STATUS */
+
+.payment-status {
+  margin-top: 0.4rem;
+  font-family: var(--font-hud);
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+
+/* PAYMENT ACTIONS */
+
+.payment-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.confirm-payment-btn,
+.cancel-payment-btn {
+  border: none;
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-hud);
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.confirm-payment-btn {
+  background: linear-gradient(
+    135deg,
+    var(--tx-green),
+    var(--tx-emerald)
+  );
+  color: #010804;
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+}
+
+.confirm-payment-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
+}
+
+.cancel-payment-btn {
+  background: rgba(255, 51, 102, 0.08);
+  border: 1px solid var(--tx-red);
+  color: var(--tx-red);
+}
+
+.cancel-payment-btn:hover:not(:disabled) {
+  background: rgba(255, 51, 102, 0.16);
+}
+
+.confirm-payment-btn:disabled,
+.cancel-payment-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* COMPLETED / CANCELLED STATUS */
+
+.payment-completed,
+.payment-cancelled {
+  text-align: center;
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-hud);
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.payment-completed {
+  color: var(--tx-green);
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid var(--tx-border-green);
+}
+
+.payment-cancelled {
+  color: var(--tx-red);
+  background: rgba(255, 51, 102, 0.08);
+  border: 1px solid var(--tx-red);
+}
+
+
+@media (max-width: 768px) {
+
+  .payment-actions {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+
+.payment-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.confirm-payment-btn,
+.cancel-payment-btn {
+  flex: 1;
+  padding: 1rem;
+  border-radius: 8px;
+  font-family: var(--font-hud);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.confirm-payment-btn {
+  background: var(--tx-green);
+  color: #010804;
+  border: none;
+}
+
+.cancel-payment-btn {
+  background: rgba(255, 51, 102, 0.08);
+  color: var(--tx-red);
+  border: 1px solid var(--tx-red);
+}
+
+.confirm-payment-btn:disabled,
+.cancel-payment-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.payment-completed,
+.payment-cancelled {
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  font-family: var(--font-hud);
+  font-weight: 800;
+}
+
+.payment-completed {
+  color: var(--tx-green);
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid var(--tx-border-green);
+}
+
+.payment-cancelled {
+  color: var(--tx-red);
+  background: rgba(255, 51, 102, 0.08);
+  border: 1px solid var(--tx-red);
+}
+
+@media (max-width: 768px) {
+  .payment-actions {
+    flex-direction: column;
+  }
+}
+
+/* ==========================================
+   PAYMENT PROCESSING STATE
+========================================== */
+
+.confirm-payment-btn:disabled,
+.cancel-payment-btn:disabled,
+.primary-btn:disabled,
+.secondary-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+
+/* ==========================================
+   CRITICAL RISK SUPPORT
+   Transaction.jsx maps CRITICAL -> high
+========================================== */
+
+.result-content-wrapper.high {
+  animation: criticalPulse 2s infinite;
+}
+
+@keyframes criticalPulse {
+
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.005);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+
+}
+
+
+/* ==========================================
+   PAYMENT STATUS IMPROVEMENTS
+========================================== */
+
+.payment-completed,
+.payment-cancelled {
+  text-align: center;
+  padding: 15px;
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.payment-completed {
+  animation: statusAppear 0.4s ease;
+}
+
+.payment-cancelled {
+  animation: statusAppear 0.4s ease;
+}
+
+@keyframes statusAppear {
+
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+}
+
+
+/* ==========================================
+   ML PROBABILITY SAFETY
+========================================== */
+
+.ml-progress-track {
+  overflow: hidden;
+}
+
+.ml-progress-bar {
+  max-width: 100%;
+  transition: width 0.7s ease;
+}
+
+
+/* ==========================================
+   RESULT TRANSITION
+========================================== */
+
+.result-content-wrapper {
+  animation: resultAppear 0.4s ease;
+}
+
+@keyframes resultAppear {
+
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+}
+
+
+/* ==========================================
+   PAYMENT BUTTON LOADING
+========================================== */
+
+.confirm-payment-btn:disabled,
+.cancel-payment-btn:disabled {
+  pointer-events: none;
+}

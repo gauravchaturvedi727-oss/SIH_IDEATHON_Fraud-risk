@@ -159,11 +159,6 @@ function Dashboard() {
 
     };
 
-
-    // ==================================
-    // INITIAL LOAD
-    // ==================================
-
     useEffect(() => {
 
         setMounted(true);
@@ -172,22 +167,12 @@ function Dashboard() {
 
     }, []);
 
-
-    // ==================================
-    // SAFE BACKEND DATA
-    // ==================================
-
     const dashboardStats =
         dashboardData?.stats || {};
 
 
     const recentActivities =
         dashboardData?.recentActivity || [];
-
-
-    // ==================================
-    // TOTAL COUNTS
-    // ==================================
 
     const totalAnalyses =
         Number(
@@ -248,11 +233,6 @@ function Dashboard() {
             dashboardStats.detectionRate || 0
         );
 
-
-    // ==================================
-    // CALCULATE PERCENTAGE
-    // ==================================
-
     const calculatePercentage = (value) => {
 
         if (!totalAnalyses) {
@@ -279,11 +259,6 @@ function Dashboard() {
 
     };
 
-
-    // ==================================
-    // INDIVIDUAL TOOL RISK
-    // ==================================
-
     const transactionRisk =
         calculatePercentage(
             highRisk
@@ -302,10 +277,6 @@ function Dashboard() {
         );
 
 
-    // ==================================
-    // OVERALL RISK SCORE
-    // ==================================
-
     const riskScore =
 
         totalAnalyses > 0
@@ -319,11 +290,6 @@ function Dashboard() {
             )
 
             : 0;
-
-
-    // ==================================
-    // RISK LEVEL
-    // ==================================
 
     let overallRiskLevel = "LOW";
 
@@ -357,10 +323,6 @@ function Dashboard() {
 
     }
 
-
-    // ==================================
-    // STATS CARDS
-    // ==================================
 
     const stats = [
 
@@ -460,10 +422,6 @@ function Dashboard() {
     ];
 
 
-    // ==================================
-    // ACTIVITY ICON
-    // ==================================
-
     const getActivityIcon = (type) => {
 
         const activityType =
@@ -509,10 +467,6 @@ function Dashboard() {
 
     };
 
-
-    // ==================================
-    // FORMAT TIME
-    // ==================================
 
     const formatTime = (date) => {
 
@@ -584,10 +538,6 @@ function Dashboard() {
     };
 
 
-    // ==================================
-    // LOADING
-    // ==================================
-
     if (loading) {
 
         return (
@@ -635,10 +585,6 @@ function Dashboard() {
     }
 
 
-    // ==================================
-    // DASHBOARD
-    // ==================================
-
     return (
 
         <>
@@ -660,8 +606,6 @@ function Dashboard() {
                 <main className="dashboard-container">
 
 
-                    {/* HERO */}
-
                     <section
                         className={`dashboard-hero ${
                             mounted
@@ -680,7 +624,7 @@ function Dashboard() {
 
                                     <span className="badge-dot"></span>
 
-                                    FRAUDGUARD AI SYSTEM
+                                    DHANRAKSHAK AI SYSTEM
 
                                 </div>
 
@@ -1543,7 +1487,7 @@ function Dashboard() {
 
                             <span className="footer-status-dot"></span>
 
-                            FraudGuard AI Engine Online
+                            DhanRakshak AI Engine Online
 
                         </div>
 

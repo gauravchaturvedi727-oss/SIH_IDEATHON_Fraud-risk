@@ -7,11 +7,13 @@ const {
 
     createTransaction,
 
+    confirmPayment,
+
+    cancelPayment,
+
     getTransactions,
 
     getTransactionById,
-
-    updateTransaction,
 
     deleteTransaction
 
@@ -38,17 +40,24 @@ router.get(
 );
 
 
-router.get(
-    "/:id",
+router.put(
+    "/:id/confirm",
     protect,
-    getTransactionById
+    confirmPayment
 );
 
 
 router.put(
+    "/:id/cancel",
+    protect,
+    cancelPayment
+);
+
+
+router.get(
     "/:id",
     protect,
-    updateTransaction
+    getTransactionById
 );
 
 

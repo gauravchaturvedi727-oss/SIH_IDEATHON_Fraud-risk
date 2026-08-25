@@ -1,11 +1,16 @@
 import os
 import re
 import json
+import uuid
+import sqlite3
 import logging
 import tempfile
 import gc
 import joblib
 import pandas as pd
+from threading import Lock
+
+from datetime import datetime, timezone
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -13,9 +18,9 @@ from groq import Groq
 from dotenv import load_dotenv
 
 
-# =========================================================
-# CONFIGURATION
-# =========================================================
+# ============================================================
+# PATHS & ENVIRONMENT
+# ============================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -35,12 +40,17 @@ UPLOAD_FOLDER = os.path.join(
     "dhanrakshak_uploads"
 )
 
+DATABASE_PATH = os.path.join(
+    BASE_DIR,
+    "dhanrakshak.db"
+)
+
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-# =========================================================
-# FLASK
-# =========================================================
+# ============================================================
+# FLASK APP
+# ============================================================
 
 app = Flask(__name__)
 
@@ -54,10 +64,6 @@ CORS(
 )
 
 
-# =========================================================
-# LOGGING
-# =========================================================
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
@@ -66,9 +72,9 @@ logging.basicConfig(
 logger = logging.getLogger("DhanRakshak")
 
 
-# =========================================================
-# TABULAR ML FEATURES
-# =========================================================
+# ============================================================
+# TRANSACTION FEATURES
+# ============================================================
 
 FEATURES = [
     "amount",
@@ -79,14 +85,541 @@ FEATURES = [
     "otpRequests"
 ]
 
+# ============================================================
+# PRIVACY-PRESERVING REVIEW & USER CONFIRMATION SYSTEM
+# ============================================================
 
-# =========================================================
-# UTILITY FUNCTIONS
-# =========================================================
+review_store = {}
+review_lock = Lock()
 
-def clamp(value, minimum=0, maximum=100):
+
+def utc_now():
+
+    return datetime.now(
+        timezone.utc
+    ).isoformat()
+
+
+def generate_review_id():
+
+    return "RVW-" + uuid.uuid4().hex[:12].upper()
+
+
+def generate_confirmation_id():
+
+    return "CNF-" + uuid.uuid4().hex[:12].upper()
+
+
+def mask_amount(amount):
 
     try:
+
+        amount = float(amount)
+
+        if amount <= 0:
+            return None
+
+        if amount < 1000:
+            return "< ₹1,000"
+
+        elif amount < 5000:
+            return "₹1,000 - ₹4,999"
+
+        elif amount < 10000:
+            return "₹5,000 - ₹9,999"
+
+        elif amount < 50000:
+            return "₹10,000 - ₹49,999"
+
+        elif amount < 100000:
+            return "₹50,000 - ₹99,999"
+
+        return "₹1,00,000+"
+
+    except Exception:
+
+        return None
+
+
+def get_review_priority(risk_score):
+
+    risk_score = float(risk_score)
+
+    if risk_score >= 85:
+        return "CRITICAL"
+
+    elif risk_score >= 60:
+        return "HIGH"
+
+    elif risk_score >= 30:
+        return "MEDIUM"
+
+    return "LOW"
+
+
+def sanitize_review_data(data):
+
+    if not isinstance(data, dict):
+
+        return {}
+
+    safe_data = {}
+
+    allowed_fields = [
+
+        "amount",
+        "newDevice",
+        "newLocation",
+        "rapidTransactions",
+        "failedLogins",
+        "otpRequests",
+        "riskScore",
+        "riskLevel",
+        "scamCategory",
+        "transactionType"
+    ]
+
+    for key in allowed_fields:
+
+        if key not in data:
+            continue
+
+        value = data.get(key)
+
+        if key == "amount":
+
+            safe_data["amountRange"] = (
+                mask_amount(value)
+            )
+
+        else:
+
+            safe_data[key] = value
+
+    return safe_data
+
+
+def create_review_record(
+
+    analysis,
+    source="TRANSACTION",
+    metadata=None,
+    user_action=None
+
+):
+
+    review_id = generate_review_id()
+
+    risk_score = float(
+        analysis.get(
+            "risk_score",
+            analysis.get(
+                "riskScore",
+                0
+            )
+        )
+    )
+
+    record = {
+
+        "reviewId":
+            review_id,
+
+        "status":
+            "PENDING",
+
+        "priority":
+            get_review_priority(
+                risk_score
+            ),
+
+        "source":
+            source,
+
+        "riskScore":
+            risk_score,
+
+        "riskLevel":
+            analysis.get(
+                "risk_level",
+                analysis.get(
+                    "riskLevel",
+                    get_risk_level(risk_score)
+                )
+            ),
+
+        "scamCategory":
+            analysis.get(
+                "scam_category",
+                analysis.get(
+                    "scamCategory",
+                    "Unknown"
+                )
+            ),
+
+        "detectedTactics":
+            unique_list(
+                analysis.get(
+                    "detected_tactics",
+                    analysis.get(
+                        "detectedTactics",
+                        []
+                    )
+                )
+            ),
+
+        "reasons":
+            unique_list(
+                analysis.get(
+                    "reasons",
+                    []
+                )
+            )[:8],
+
+        "recommendedAction":
+            analysis.get(
+                "recommended_action",
+                analysis.get(
+                    "recommendedAction",
+                    "Verify independently."
+                )
+            ),
+
+        "metadata":
+            sanitize_review_data(
+                metadata or {}
+            ),
+
+        "userAction":
+            user_action,
+
+        "createdAt":
+            utc_now(),
+
+        "updatedAt":
+            utc_now(),
+
+        "resolvedAt":
+            None,
+
+        "reviewDecision":
+            None,
+
+        "reviewerNote":
+            None
+    }
+
+
+    with review_lock:
+
+        review_store[
+            review_id
+        ] = record
+
+
+    return record
+
+
+def queue_review_if_required(
+
+    analysis,
+    source="TRANSACTION",
+    metadata=None
+
+):
+
+    risk_score = float(
+        analysis.get(
+            "risk_score",
+            analysis.get(
+                "riskScore",
+                0
+            )
+        )
+    )
+
+
+    # HIGH and CRITICAL automatically enter review queue.
+    if risk_score >= 60:
+
+        return create_review_record(
+
+            analysis=analysis,
+
+            source=source,
+
+            metadata=metadata
+        )
+
+
+    return None
+
+
+def get_confirmation_requirement(risk_score):
+
+    risk_score = float(risk_score)
+
+    if risk_score >= 85:
+
+        return {
+
+            "requiresConfirmation": True,
+
+            "warningLevel": "CRITICAL",
+
+            "canProceed": True,
+
+            "reviewRecommended": True,
+
+            "message":
+                (
+                    "Critical fraud indicators detected. "
+                    "Proceed only if you independently verified "
+                    "the recipient and transaction."
+                )
+        }
+
+
+    elif risk_score >= 60:
+
+        return {
+
+            "requiresConfirmation": True,
+
+            "warningLevel": "HIGH",
+
+            "canProceed": True,
+
+            "reviewRecommended": True,
+
+            "message":
+                (
+                    "High-risk activity detected. "
+                    "Verify transaction details before proceeding."
+                )
+        }
+
+
+    elif risk_score >= 30:
+
+        return {
+
+            "requiresConfirmation": True,
+
+            "warningLevel": "MEDIUM",
+
+            "canProceed": True,
+
+            "reviewRecommended": False,
+
+            "message":
+                (
+                    "Suspicious indicators detected. "
+                    "Please review and confirm before proceeding."
+                )
+        }
+
+
+    return {
+
+        "requiresConfirmation": False,
+
+        "warningLevel": "LOW",
+
+        "canProceed": True,
+
+        "reviewRecommended": False,
+
+        "message":
+            "No strong fraud indicators detected."
+    }
+
+
+def build_transaction_analysis(
+
+    risk_score,
+    risk_level,
+    fraud_probability
+
+):
+
+    return {
+
+        "risk_score":
+            float(risk_score),
+
+        "risk_level":
+            risk_level,
+
+        "fraud_probability":
+            float(fraud_probability),
+
+        "scam_category":
+            "Suspicious Payment Behavior"
+            if float(risk_score) >= 30
+            else "Normal Payment Behavior",
+
+        "detected_tactics":
+            [],
+
+        "reasons":
+            [
+                "Transaction risk was calculated using behavioral and device signals."
+            ],
+
+        "recommended_action":
+
+            "Verify the transaction before proceeding."
+
+            if float(risk_score) >= 30
+
+            else
+
+            "No strong fraud evidence detected."
+    }
+    
+
+# ============================================================
+# DATABASE
+# ============================================================
+
+def get_db_connection():
+
+    connection = sqlite3.connect(
+        DATABASE_PATH
+    )
+
+    connection.row_factory = sqlite3.Row
+
+    return connection
+
+
+def init_database():
+
+    connection = None
+
+    try:
+
+        connection = get_db_connection()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS transaction_audits (
+
+                id TEXT PRIMARY KEY,
+
+                transaction_reference TEXT,
+
+                amount REAL,
+
+                risk_score REAL,
+
+                risk_level TEXT,
+
+                fraud_probability REAL,
+
+                user_action TEXT,
+
+                user_confirmed INTEGER DEFAULT 0,
+
+                created_at TEXT
+
+            )
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS false_positive_reviews (
+
+                id TEXT PRIMARY KEY,
+
+                transaction_id TEXT,
+
+                risk_score REAL,
+
+                risk_level TEXT,
+
+                user_reason TEXT,
+
+                user_comment TEXT,
+
+                status TEXT DEFAULT 'PENDING',
+
+                reviewer_comment TEXT,
+
+                reviewed_by TEXT,
+
+                created_at TEXT,
+
+                reviewed_at TEXT
+
+            )
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS privacy_audit (
+
+                id TEXT PRIMARY KEY,
+
+                event_type TEXT,
+
+                resource_id TEXT,
+
+                details TEXT,
+
+                created_at TEXT
+
+            )
+            """
+        )
+
+        connection.commit()
+
+        logger.info(
+            "Database initialized successfully."
+        )
+
+    except Exception as error:
+
+        logger.exception(
+            "Database initialization failed: %s",
+            repr(error)
+        )
+
+    finally:
+
+        if connection:
+
+            connection.close()
+
+
+init_database()
+
+
+# ============================================================
+# GENERAL HELPERS
+# ============================================================
+
+def now_utc():
+
+    return datetime.now(
+        timezone.utc
+    ).isoformat()
+
+
+def clamp(
+    value,
+    minimum=0,
+    maximum=100
+):
+
+    try:
+
         value = float(value)
 
         if value < minimum:
@@ -98,6 +631,7 @@ def clamp(value, minimum=0, maximum=100):
         return value
 
     except Exception:
+
         return minimum
 
 
@@ -108,7 +642,11 @@ def clean_text(text):
 
     text = str(text)
 
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
 
     return text.strip()
 
@@ -118,7 +656,10 @@ def unique_list(items):
     result = []
     seen = set()
 
-    if not isinstance(items, list):
+    if not isinstance(
+        items,
+        list
+    ):
         return result
 
     for item in items:
@@ -141,11 +682,16 @@ def unique_list(items):
 
 def normalize_bool(value):
 
-    if isinstance(value, bool):
+    if isinstance(
+        value,
+        bool
+    ):
         return int(value)
 
     return int(
-        str(value).strip().lower()
+        str(value)
+        .strip()
+        .lower()
         in [
             "true",
             "1",
@@ -171,9 +717,120 @@ def get_risk_level(score):
     return "LOW"
 
 
-# =========================================================
-# SAFE CONTEXT DETECTION
-# =========================================================
+# ============================================================
+# PRIVACY PRESERVING HELPERS
+# ============================================================
+
+def mask_sensitive_text(text):
+
+    """
+    Prevent sensitive credentials from being
+    stored in logs/review records.
+    """
+
+    text = clean_text(text)
+
+    if not text:
+        return ""
+
+    patterns = [
+
+        (
+            r"(?i)(otp\s*[:=-]?\s*)\d+",
+            r"\1[MASKED]"
+        ),
+
+        (
+            r"(?i)(pin\s*[:=-]?\s*)\d+",
+            r"\1[MASKED]"
+        ),
+
+        (
+            r"(?i)(cvv\s*[:=-]?\s*)\d+",
+            r"\1[MASKED]"
+        ),
+
+        (
+            r"(?i)(mpin\s*[:=-]?\s*)\d+",
+            r"\1[MASKED]"
+        ),
+
+        (
+            r"(?i)(password\s*[:=-]?\s*)\S+",
+            r"\1[MASKED]"
+        )
+    ]
+
+    for pattern, replacement in patterns:
+
+        text = re.sub(
+            pattern,
+            replacement,
+            text
+        )
+
+    return text
+
+
+def sanitize_review_comment(text):
+
+    text = mask_sensitive_text(text)
+
+    # Keep review comments reasonably limited.
+    return text[:1000]
+
+
+def create_privacy_audit(
+    event_type,
+    resource_id,
+    details=""
+):
+
+    connection = None
+
+    try:
+
+        connection = get_db_connection()
+
+        connection.execute(
+            """
+            INSERT INTO privacy_audit (
+                id,
+                event_type,
+                resource_id,
+                details,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                clean_text(event_type)[:100],
+                clean_text(resource_id)[:100],
+                mask_sensitive_text(details)[:500],
+                now_utc()
+            )
+        )
+
+        connection.commit()
+
+    except Exception as error:
+
+        logger.warning(
+            "Privacy audit logging failed: %s",
+            repr(error)
+        )
+
+    finally:
+
+        if connection:
+
+            connection.close()
+
+
+# ============================================================
+# FRAUD MESSAGE SAFE CONTEXT DETECTION
+# ============================================================
 
 def is_safety_advisory(text):
 
@@ -182,8 +839,6 @@ def is_safety_advisory(text):
     if not t:
         return False
 
-
-    # Dangerous links / APK / suspicious URLs
     dangerous_link = re.search(
         r"(bit\.ly|tinyurl|t\.me|wa\.me|\.apk|"
         r"\b\d{1,3}(?:\.\d{1,3}){3}\b)",
@@ -192,7 +847,6 @@ def is_safety_advisory(text):
 
     if dangerous_link:
         return False
-
 
     safe_signals = [
 
@@ -226,15 +880,16 @@ def is_safety_advisory(text):
         r"\bsavdhan rahein\b"
     ]
 
-
     score = 0
 
     for pattern in safe_signals:
 
-        if re.search(pattern, t, re.IGNORECASE):
-
+        if re.search(
+            pattern,
+            t,
+            re.IGNORECASE
+        ):
             score += 1
-
 
     return score >= 2
 
@@ -244,7 +899,6 @@ def get_legitimate_context_score(text):
     t = clean_text(text).lower()
 
     score = 0
-
 
     safe_patterns = [
 
@@ -267,20 +921,17 @@ def get_legitimate_context_score(text):
         r"\bsecurity advisory\b"
     ]
 
-
     for pattern in safe_patterns:
 
-        if re.search(pattern, t, re.IGNORECASE):
-
+        if re.search(
+            pattern,
+            t,
+            re.IGNORECASE
+        ):
             score += 1
-
 
     return score
 
-
-# =========================================================
-# LEGITIMATE BANK SMS DETECTION
-# =========================================================
 
 def is_legitimate_transaction_sms(text):
 
@@ -309,15 +960,16 @@ def is_legitimate_transaction_sms(text):
         r"\ba/c ending\b"
     ]
 
-
     count = 0
 
     for pattern in transaction_patterns:
 
-        if re.search(pattern, t, re.IGNORECASE):
-
+        if re.search(
+            pattern,
+            t,
+            re.IGNORECASE
+        ):
             count += 1
-
 
     dangerous_action = re.search(
 
@@ -330,15 +982,13 @@ def is_legitimate_transaction_sms(text):
         re.IGNORECASE
     )
 
-
     return count >= 2 and not dangerous_action
 
 
-# =========================================================
-# NEGATION DETECTION
-# =========================================================
-
-def has_safe_negation_before(text, keyword):
+def has_safe_negation_before(
+    text,
+    keyword
+):
 
     patterns = [
 
@@ -347,20 +997,21 @@ def has_safe_negation_before(text, keyword):
         rf"\b{keyword}\b.{{0,60}}\b(do not|don't|never)\b"
     ]
 
-
     for pattern in patterns:
 
-        if re.search(pattern, text, re.IGNORECASE):
-
+        if re.search(
+            pattern,
+            text,
+            re.IGNORECASE
+        ):
             return True
-
 
     return False
 
 
-# =========================================================
-# SCAM RULE DEFINITIONS
-# =========================================================
+# ============================================================
+# FRAUD RULES
+# ============================================================
 
 RULES = [
 
@@ -370,37 +1021,22 @@ RULES = [
         "patterns": [
 
             r"\bdigital arrest\b",
-
             r"\byou (are|will be) arrested\b",
-
             r"\barrest warrant\b",
-
             r"\bpolice case\b",
-
             r"\bcriminal case\b",
-
             r"\bcbi officer\b",
-
             r"\bpolice officer\b",
-
             r"\bcyber crime officer\b",
-
             r"\bnarcotics officer\b",
-
             r"\bcustoms officer\b",
-
             r"\bmoney laundering case\b",
-
             r"\billegal parcel\b",
-
             r"\bdrugs found\b",
-
             r"\bskype interrogation\b",
-
             r"\bvideo call investigation\b"
         ]
     },
-
 
     {
         "name": "Remote Access / APK Fraud",
@@ -408,31 +1044,19 @@ RULES = [
         "patterns": [
 
             r"\bdownload apk\b",
-
             r"\binstall apk\b",
-
             r"\bdownload the app from this link\b",
-
             r"\binstall this application\b",
-
             r"\banydesk\b",
-
             r"\bteamviewer\b",
-
             r"\brustdesk\b",
-
             r"\bquicksupport\b",
-
             r"\bshare your screen\b",
-
             r"\bscreen share\b",
-
             r"\bgive remote access\b",
-
             r"\bremote access\b"
         ]
     },
-
 
     {
         "name": "OTP / Credential Theft",
@@ -440,25 +1064,16 @@ RULES = [
         "patterns": [
 
             r"\bshare.{0,50}\b(otp|pin|cvv|password|mpin)\b",
-
             r"\bsend.{0,50}\b(otp|pin|cvv|password|mpin)\b",
-
             r"\bgive.{0,50}\b(otp|pin|cvv|password|mpin)\b",
-
             r"\bprovide.{0,50}\b(otp|pin|cvv|password|mpin)\b",
-
             r"\btell.{0,50}\b(otp|pin|cvv|password|mpin)\b",
-
             r"\benter.{0,50}\b(otp|pin|cvv|password|mpin)\b",
-
             r"\bforward.{0,50}\b(otp|pin|cvv|password)\b",
-
             r"\bbatao.{0,50}\b(otp|pin|cvv)\b",
-
             r"\bbhejo.{0,50}\b(otp|pin|cvv)\b"
         ]
     },
-
 
     {
         "name": "KYC / Account Suspension Fraud",
@@ -474,17 +1089,12 @@ RULES = [
             r"\b(blocked|frozen|suspended)\b",
 
             r"\bupdate kyc immediately\b",
-
             r"\bcomplete kyc immediately\b",
-
             r"\baccount will be blocked\b",
-
             r"\baccount will be frozen\b",
-
             r"\baccount suspension\b"
         ]
     },
-
 
     {
         "name": "Utility Disconnection Scam",
@@ -507,32 +1117,20 @@ RULES = [
         ]
     },
 
-
     {
         "name": "Fake Job / Task Scam",
         "score": 70,
         "patterns": [
 
-            r"\bpart.?time job\b.{0,100}"
-            r"\bearn\b",
-
-            r"\bwork from home\b.{0,100}"
-            r"\bearn\b",
-
+            r"\bpart.?time job\b.{0,100}\bearn\b",
+            r"\bwork from home\b.{0,100}\bearn\b",
             r"\btelegram task\b",
-
-            r"\byoutube like.{0,60}"
-            r"\bearn\b",
-
+            r"\byoutube like.{0,60}\bearn\b",
             r"\bgoogle review task\b",
-
             r"\bprepaid task\b",
-
-            r"\bcomplete task.{0,80}"
-            r"\bcommission\b"
+            r"\bcomplete task.{0,80}\bcommission\b"
         ]
     },
-
 
     {
         "name": "Investment / Guaranteed Return Scam",
@@ -540,19 +1138,13 @@ RULES = [
         "patterns": [
 
             r"\bguaranteed return\b",
-
             r"\bguaranteed profit\b",
-
             r"\binvest.{0,60}\bdouble\b",
-
             r"\bdouble your money\b",
-
             r"\bcrypto.{0,80}\bguaranteed\b",
-
             r"\bdeposit.{0,60}\bget\b"
         ]
     },
-
 
     {
         "name": "Lottery / Prize Scam",
@@ -560,17 +1152,12 @@ RULES = [
         "patterns": [
 
             r"\byou have won\b",
-
             r"\bwon a prize\b",
-
             r"\blottery winner\b",
-
             r"\bclaim your prize\b",
-
             r"\bprocessing fee\b.{0,80}\bprize\b"
         ]
     },
-
 
     {
         "name": "Suspicious Link",
@@ -578,11 +1165,8 @@ RULES = [
         "patterns": [
 
             r"\bbit\.ly\b",
-
             r"\btinyurl\b",
-
             r"\bshorturl\b",
-
             r"\bgoo\.gl\b",
 
             r"\bclick here\b.{0,100}"
@@ -590,167 +1174,101 @@ RULES = [
         ]
     },
 
-
     {
         "name": "Urgency / Pressure",
         "score": 18,
         "patterns": [
 
             r"\bimmediately\b",
-
             r"\burgent\b",
-
             r"\bright now\b",
-
             r"\bwithin \d+ (minute|minutes|hour|hours)\b",
-
             r"\bfinal warning\b",
-
             r"\blast warning\b",
-
             r"\baction will be taken\b",
-
             r"\bturant\b",
-
             r"\bjaldi\b"
         ]
     }
 ]
 
 
-# =========================================================
+# ============================================================
 # RULE ENGINE
-# =========================================================
+# ============================================================
 
 def evaluate_rules(text):
 
     text = clean_text(text)
     t = text.lower()
 
-
-    # -----------------------------------------------------
-    # 1. Empty
-    # -----------------------------------------------------
-
     if not text:
 
         return {
-
             "is_scam": False,
-
             "risk_score": 0,
-
             "risk_level": "LOW",
-
             "scam_category": "No Content",
-
             "confidence": 1.0,
-
             "detected_tactics": [],
-
             "suspicious_indicators": [],
-
             "reasons": [
                 "No message content provided."
             ],
-
             "recommended_action":
                 "Provide message content for analysis.",
-
             "engineUsed":
                 "Rule-Engine"
         }
 
-
-    # -----------------------------------------------------
-    # 2. SAFETY ADVISORY
-    # -----------------------------------------------------
-
     if is_safety_advisory(text):
 
         return {
-
             "is_scam": False,
-
             "risk_score": 2,
-
             "risk_level": "LOW",
-
             "scam_category":
                 "Legitimate Safety Advisory",
-
             "confidence": 0.98,
-
             "detected_tactics": [],
-
             "suspicious_indicators": [],
-
             "reasons": [
-
                 "The message warns users not to share sensitive credentials.",
-
                 "It directs users toward official verification channels."
             ],
-
             "recommended_action":
                 "This appears to be a safety or fraud-prevention advisory.",
-
             "engineUsed":
                 "Safe-Context-Rule-Engine"
         }
 
-
-    # -----------------------------------------------------
-    # 3. LEGITIMATE TRANSACTION
-    # -----------------------------------------------------
-
     if is_legitimate_transaction_sms(text):
 
         return {
-
             "is_scam": False,
-
             "risk_score": 3,
-
             "risk_level": "LOW",
-
             "scam_category":
                 "Legitimate Transaction Alert",
-
             "confidence": 0.97,
-
             "detected_tactics": [],
-
             "suspicious_indicators": [],
-
             "reasons": [
-
                 "Message matches a standard transactional notification format."
             ],
-
             "recommended_action":
                 "No strong scam indicators detected.",
-
             "engineUsed":
                 "Transaction-Rule-Engine"
         }
 
-
-    # -----------------------------------------------------
-    # 4. NORMAL SAFE TEXT
-    # -----------------------------------------------------
-
     matched_rules = []
-
     all_indicators = []
-
     reasons = []
-
 
     for rule in RULES:
 
         matches = []
-
 
         for pattern in rule["patterns"]:
 
@@ -760,21 +1278,15 @@ def evaluate_rules(text):
                 re.IGNORECASE
             )
 
-
             for match in found:
 
                 matched = match.group(0).strip()
 
                 if matched:
-
                     matches.append(matched)
-
 
         if matches:
 
-            # Important:
-            # Ignore OTP rule if context says:
-            # "Do not share OTP"
             if rule["name"] == "OTP / Credential Theft":
 
                 credential_words = [
@@ -789,7 +1301,10 @@ def evaluate_rules(text):
 
                 for word in credential_words:
 
-                    if re.search(rf"\b{word}\b", t):
+                    if re.search(
+                        rf"\b{word}\b",
+                        t
+                    ):
 
                         if not has_safe_negation_before(
                             t,
@@ -797,107 +1312,68 @@ def evaluate_rules(text):
                         ):
                             all_negated = False
 
-
                 if all_negated:
-
                     continue
 
-
-            matched_rules.append({
-
-                "name": rule["name"],
-
-                "score": rule["score"],
-
-                "matches":
-                    unique_list(matches)
-            })
-
+            matched_rules.append(
+                {
+                    "name": rule["name"],
+                    "score": rule["score"],
+                    "matches": unique_list(matches)
+                }
+            )
 
             all_indicators.extend(matches)
-
-
-    # -----------------------------------------------------
-    # No rules
-    # -----------------------------------------------------
 
     if not matched_rules:
 
         return {
-
             "is_scam": False,
-
             "risk_score": 5,
-
             "risk_level": "LOW",
-
             "scam_category":
                 "No Strong Fraud Pattern",
-
             "confidence": 0.88,
-
             "detected_tactics": [],
-
             "suspicious_indicators": [],
-
             "reasons": [
-
                 "No strong scam pattern or coercive action was detected."
             ],
-
             "recommended_action":
                 "No strong fraud evidence detected. Continue normal caution.",
-
             "engineUsed":
                 "Rule-Engine"
         }
-
-
-    # -----------------------------------------------------
-    # Calculate score
-    # -----------------------------------------------------
 
     matched_rules.sort(
         key=lambda x: x["score"],
         reverse=True
     )
 
-
     primary = matched_rules[0]
 
-
     score = float(primary["score"])
-
 
     for extra in matched_rules[1:]:
 
         name = extra["name"]
 
         if name == "Urgency / Pressure":
-
             score += 8
 
         elif name == "Suspicious Link":
-
             score += 10
 
         else:
-
             score += min(
                 extra["score"] * 0.18,
                 15
             )
 
-
     categories = [
         item["name"]
         for item in matched_rules
     ]
-
-
-    # -----------------------------------------------------
-    # Severe combinations
-    # -----------------------------------------------------
 
     has_otp = (
         "OTP / Credential Theft"
@@ -924,7 +1400,6 @@ def evaluate_rules(text):
         in categories
     )
 
-
     if has_otp and has_remote:
 
         score += 12
@@ -932,7 +1407,6 @@ def evaluate_rules(text):
         reasons.append(
             "Remote access combined with credential theft is highly dangerous."
         )
-
 
     if has_digital_arrest and has_otp:
 
@@ -942,7 +1416,6 @@ def evaluate_rules(text):
             "Police impersonation combined with credential theft detected."
         )
 
-
     if has_kyc and has_urgency:
 
         score += 8
@@ -951,30 +1424,19 @@ def evaluate_rules(text):
             "Account threat combined with urgency increases fraud likelihood."
         )
 
-
-    score = int(clamp(score))
-
+    score = int(
+        clamp(score)
+    )
 
     level = get_risk_level(score)
 
-
     is_scam = score >= 30
-
-
-    # -----------------------------------------------------
-    # Reasons
-    # -----------------------------------------------------
 
     for item in matched_rules:
 
         reasons.append(
             f"Detected indicators related to {item['name']}."
         )
-
-
-    # -----------------------------------------------------
-    # Recommended action
-    # -----------------------------------------------------
 
     if score >= 85:
 
@@ -984,14 +1446,12 @@ def evaluate_rules(text):
             "Do not install APK files or provide remote access."
         )
 
-
     elif score >= 60:
 
         action = (
             "HIGH RISK: Do not follow instructions in this message. "
             "Verify independently using the institution's official website or app."
         )
-
 
     elif score >= 30:
 
@@ -1000,7 +1460,6 @@ def evaluate_rules(text):
             "Do not click links or share sensitive information until independently verified."
         )
 
-
     else:
 
         action = (
@@ -1008,43 +1467,32 @@ def evaluate_rules(text):
             "but remain cautious."
         )
 
-
     return {
-
         "is_scam": is_scam,
-
         "risk_score": score,
-
         "risk_level": level,
-
         "scam_category":
             primary["name"],
-
         "confidence":
             0.97 if score >= 85
             else 0.93 if score >= 60
             else 0.85,
-
         "detected_tactics":
             unique_list(categories),
-
         "suspicious_indicators":
             unique_list(all_indicators),
-
         "reasons":
             unique_list(reasons),
-
         "recommended_action":
             action,
-
         "engineUsed":
             "Advanced-Calibrated-Rule-Engine"
     }
 
 
-# =========================================================
+# ============================================================
 # GROQ INITIALIZATION
-# =========================================================
+# ============================================================
 
 groq_client = None
 groq_verified = False
@@ -1060,8 +1508,9 @@ def initialize_groq():
     global CHAT_MODEL
     global TRANSCRIPTION_MODEL
 
-
-    if not GROQ_API_KEY.startswith("gsk_"):
+    if not GROQ_API_KEY.startswith(
+        "gsk_"
+    ):
 
         logger.warning(
             "Groq key missing. AI analysis disabled."
@@ -1069,35 +1518,28 @@ def initialize_groq():
 
         return
 
-
     try:
 
         groq_client = Groq(
             api_key=GROQ_API_KEY
         )
 
-
         models_response = (
             groq_client.models.list()
         )
 
-
         available_models = [
 
             item.id
-
             for item
             in models_response.data
         ]
 
-
         preferred_chat_models = [
 
             "llama-3.3-70b-versatile",
-
             "llama-3.1-8b-instant"
         ]
-
 
         for model_name in preferred_chat_models:
 
@@ -1107,21 +1549,17 @@ def initialize_groq():
 
                 break
 
-
         if CHAT_MODEL is None:
 
             CHAT_MODEL = (
                 preferred_chat_models[0]
             )
 
-
         preferred_audio_models = [
 
             "whisper-large-v3-turbo",
-
             "whisper-large-v3"
         ]
-
 
         for model_name in preferred_audio_models:
 
@@ -1131,21 +1569,17 @@ def initialize_groq():
 
                 break
 
-
         if TRANSCRIPTION_MODEL is None:
 
             TRANSCRIPTION_MODEL = (
                 "whisper-large-v3"
             )
 
-
         groq_verified = True
-
 
         logger.info(
             "Groq initialized successfully."
         )
-
 
     except Exception as error:
 
@@ -1154,7 +1588,6 @@ def initialize_groq():
             repr(error)
         )
 
-
         groq_client = None
         groq_verified = False
 
@@ -1162,16 +1595,17 @@ def initialize_groq():
 initialize_groq()
 
 
-# =========================================================
-# LOAD TABULAR MODEL
-# =========================================================
+# ============================================================
+# ML MODEL
+# ============================================================
 
 model = None
 
-
 try:
 
-    if os.path.exists(MODEL_PATH):
+    if os.path.exists(
+        MODEL_PATH
+    ):
 
         model = joblib.load(
             MODEL_PATH
@@ -1187,7 +1621,6 @@ try:
             "ML model not found. Heuristic fallback active."
         )
 
-
 except Exception as error:
 
     logger.error(
@@ -1196,9 +1629,9 @@ except Exception as error:
     )
 
 
-# =========================================================
-# AI ANALYSIS
-# =========================================================
+# ============================================================
+# AI PROMPT
+# ============================================================
 
 SYSTEM_PROMPT = """
 You are a financial fraud detection system.
@@ -1214,6 +1647,7 @@ SAFE EXAMPLES:
 - "Verify only through the official bank app."
 - "Banks never ask for your PIN."
 - Normal bank transaction notifications.
+
 These should receive LOW risk, normally 0-10.
 
 SCAM EXAMPLES:
@@ -1223,6 +1657,7 @@ SCAM EXAMPLES:
 - Digital arrest or police impersonation.
 - Threatening account block and demanding immediate action through a link.
 - Fake task/job/investment schemes.
+- Coercive pressure, threats, urgency or intimidation.
 
 Return ONLY valid JSON:
 
@@ -1251,7 +1686,6 @@ def extract_clean_json(content):
 
     content = content.strip()
 
-
     if content.startswith("```"):
 
         content = re.sub(
@@ -1261,18 +1695,14 @@ def extract_clean_json(content):
             flags=re.IGNORECASE
         )
 
-
         content = re.sub(
             r"\s*```$",
             "",
             content
         )
 
-
     start = content.find("{")
-
     end = content.rfind("}")
-
 
     if start != -1 and end != -1:
 
@@ -1280,26 +1710,19 @@ def extract_clean_json(content):
             start:end + 1
         ]
 
-
     return json.loads(content)
 
 
 def analyze_with_ai(text):
 
     if not groq_verified:
-
         return None
-
 
     if not groq_client:
-
         return None
-
 
     if not CHAT_MODEL:
-
         return None
-
 
     try:
 
@@ -1332,17 +1755,14 @@ def analyze_with_ai(text):
             )
         )
 
-
         content = (
             response.choices[0]
             .message.content
         )
 
-
         data = extract_clean_json(
             content
         )
-
 
         score = int(
             clamp(
@@ -1352,7 +1772,6 @@ def analyze_with_ai(text):
                 )
             )
         )
-
 
         return {
 
@@ -1418,7 +1837,6 @@ def analyze_with_ai(text):
                 f"Groq-{CHAT_MODEL}"
         }
 
-
     except Exception as error:
 
         logger.warning(
@@ -1429,166 +1847,105 @@ def analyze_with_ai(text):
         return None
 
 
-# =========================================================
-# HYBRID MESSAGE ANALYSIS
-# =========================================================
+# ============================================================
+# HYBRID CONTENT ANALYSIS
+# ============================================================
 
 def analyze_content(text):
 
     text = clean_text(text)
 
-
     if not text:
 
         return {
-
             "is_scam": False,
-
             "risk_score": 0,
-
             "risk_level": "LOW",
-
             "scam_category":
                 "No Content",
-
             "confidence": 1.0,
-
             "detected_tactics": [],
-
             "suspicious_indicators": [],
-
             "reasons": [
                 "No message content provided."
             ],
-
             "recommended_action":
                 "Provide a valid message.",
-
             "engineUsed":
                 "Validation"
         }
 
-
-    # Rule engine first
     rule_result = evaluate_rules(
         text
     )
-
 
     rule_score = (
         rule_result["risk_score"]
     )
 
-
-    # =====================================================
-    # SAFE RULE SHORT CIRCUIT
-    # AI cannot turn a clear safety advisory into scam
-    # =====================================================
-
     if rule_result["scam_category"] in [
 
         "Legitimate Safety Advisory",
-
         "Legitimate Transaction Alert"
 
     ]:
 
         return rule_result
 
-
-    # =====================================================
-    # AI
-    # =====================================================
-
     ai_result = analyze_with_ai(
         text
     )
-
 
     if ai_result is None:
 
         return rule_result
 
-
     ai_score = (
         ai_result["risk_score"]
     )
 
-
-    # =====================================================
-    # SCORING STRATEGY
-    # =====================================================
-
-    # Strong deterministic scam:
-    # Rules should dominate
     if rule_score >= 85:
 
         final_score = round(
-
             rule_score * 0.80
-
             +
-
             ai_score * 0.20
         )
 
-
-    # Strong scam
     elif rule_score >= 60:
 
         final_score = round(
-
             rule_score * 0.65
-
             +
-
             ai_score * 0.35
         )
 
-
-    # Medium suspicion
     elif rule_score >= 30:
 
         final_score = round(
-
             rule_score * 0.55
-
             +
-
             ai_score * 0.45
         )
 
-
-    # Weak rule signal
     else:
 
-        # Don't let AI randomly produce 100
         final_score = round(
-
             rule_score * 0.50
-
             +
-
             ai_score * 0.50
         )
-
 
         final_score = min(
             final_score,
             40
         )
 
-
-    # =====================================================
-    # EXTRA SAFE DE-ESCALATION
-    # =====================================================
-
     legitimate_score = (
         get_legitimate_context_score(
             text
         )
     )
-
 
     if legitimate_score >= 2:
 
@@ -1597,18 +1954,13 @@ def analyze_content(text):
             15
         )
 
-
     final_score = int(
         clamp(final_score)
     )
 
-
-    final_level = (
-        get_risk_level(
-            final_score
-        )
+    final_level = get_risk_level(
+        final_score
     )
-
 
     if final_score >= 85:
 
@@ -1618,14 +1970,12 @@ def analyze_content(text):
             "or provide remote access."
         )
 
-
     elif final_score >= 60:
 
         action = (
             "HIGH RISK: Do not follow the message instructions. "
             "Verify using an independently obtained official contact."
         )
-
 
     elif final_score >= 30:
 
@@ -1634,13 +1984,11 @@ def analyze_content(text):
             "Verify before taking any action."
         )
 
-
     else:
 
         action = (
             "LOW RISK: No strong fraud evidence detected."
         )
-
 
     return {
 
@@ -1665,12 +2013,10 @@ def analyze_content(text):
 
             round(
                 max(
-
                     rule_result.get(
                         "confidence",
                         0.80
                     ),
-
                     ai_result.get(
                         "confidence",
                         0.80
@@ -1734,7 +2080,6 @@ def analyze_content(text):
             action,
 
         "engineUsed":
-
             f"Hybrid Rules + {ai_result['engineUsed']}",
 
         "engineScores": {
@@ -1751,9 +2096,257 @@ def analyze_content(text):
     }
 
 
-# =========================================================
+# ============================================================
+# TRANSACTION RISK HELPER
+# ============================================================
+
+def calculate_transaction_risk(data):
+
+    amount = max(
+        0,
+        float(
+            data.get(
+                "amount",
+                0
+            )
+        )
+    )
+
+    new_device = normalize_bool(
+        data.get(
+            "newDevice",
+            False
+        )
+    )
+
+    new_location = normalize_bool(
+        data.get(
+            "newLocation",
+            False
+        )
+    )
+
+    rapid_txns = max(
+        0,
+        int(
+            data.get(
+                "rapidTransactions",
+                0
+            )
+        )
+    )
+
+    failed_logins = max(
+        0,
+        int(
+            data.get(
+                "failedLogins",
+                0
+            )
+        )
+    )
+
+    otp_requests = max(
+        0,
+        int(
+            data.get(
+                "otpRequests",
+                0
+            )
+        )
+    )
+
+    input_df = pd.DataFrame(
+
+        [[
+            amount,
+            new_device,
+            new_location,
+            rapid_txns,
+            failed_logins,
+            otp_requests
+        ]],
+
+        columns=FEATURES
+    )
+
+    if model is not None:
+
+        probabilities = (
+            model.predict_proba(
+                input_df
+            )[0]
+        )
+
+        classes = list(
+            model.classes_
+        )
+
+        if 1 in classes:
+
+            fraud_index = (
+                classes.index(1)
+            )
+
+        elif "1" in classes:
+
+            fraud_index = (
+                classes.index("1")
+            )
+
+        else:
+
+            fraud_index = 1
+
+        fraud_probability = float(
+            probabilities[
+                fraud_index
+            ]
+        )
+
+        risk_score = round(
+            clamp(
+                fraud_probability * 100
+            ),
+            2
+        )
+
+    else:
+
+        risk_score = 3
+
+        if amount >= 100000:
+            risk_score += 25
+
+        elif amount >= 50000:
+            risk_score += 18
+
+        elif amount >= 15000:
+            risk_score += 10
+
+        if new_device:
+            risk_score += 18
+
+        if new_location:
+            risk_score += 15
+
+        if rapid_txns >= 5:
+            risk_score += 25
+
+        elif rapid_txns >= 3:
+            risk_score += 15
+
+        if failed_logins >= 5:
+            risk_score += 20
+
+        elif failed_logins >= 2:
+            risk_score += 10
+
+        if otp_requests >= 5:
+            risk_score += 20
+
+        elif otp_requests >= 3:
+            risk_score += 12
+
+        risk_score = round(
+            clamp(risk_score),
+            2
+        )
+
+        fraud_probability = round(
+            risk_score / 100,
+            4
+        )
+
+    return {
+        "amount": amount,
+        "newDevice": new_device,
+        "newLocation": new_location,
+        "rapidTransactions": rapid_txns,
+        "failedLogins": failed_logins,
+        "otpRequests": otp_requests,
+        "riskScore": risk_score,
+        "riskLevel":
+            get_risk_level(risk_score),
+        "fraudProbability":
+            fraud_probability
+    }
+
+
+# ============================================================
+# STORE TRANSACTION AUDIT
+# ============================================================
+
+def save_transaction_audit(
+    transaction_id,
+    transaction_reference,
+    amount,
+    risk_score,
+    risk_level,
+    fraud_probability,
+    user_action="RISK_CHECK",
+    user_confirmed=0
+):
+
+    connection = None
+
+    try:
+
+        connection = get_db_connection()
+
+        connection.execute(
+            """
+            INSERT INTO transaction_audits (
+                id,
+                transaction_reference,
+                amount,
+                risk_score,
+                risk_level,
+                fraud_probability,
+                user_action,
+                user_confirmed,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                transaction_id,
+                clean_text(
+                    transaction_reference
+                )[:100],
+                float(amount),
+                float(risk_score),
+                clean_text(risk_level)[:30],
+                float(fraud_probability),
+                clean_text(user_action)[:100],
+                int(user_confirmed),
+                now_utc()
+            )
+        )
+
+        connection.commit()
+
+        return True
+
+    except Exception as error:
+
+        logger.error(
+            "Transaction audit save failed: %s",
+            repr(error)
+        )
+
+        return False
+
+    finally:
+
+        if connection:
+
+            connection.close()
+
+
+# ============================================================
 # MESSAGE API
-# =========================================================
+# ============================================================
 
 @app.post("/analyze-message")
 @app.post("/api/analyze-message")
@@ -1768,18 +2361,12 @@ def analyze_message():
             or {}
         )
 
-
         text = clean_text(
-
             data.get("message")
-
             or
-
             data.get("text")
-
             or ""
         )
-
 
         if not text:
 
@@ -1792,18 +2379,22 @@ def analyze_message():
 
             }), 400
 
-
         result = analyze_content(
             text
         )
 
+        create_privacy_audit(
+            "MESSAGE_ANALYZED",
+            str(uuid.uuid4()),
+            "Raw message content was not stored in audit records."
+        )
 
         return jsonify({
 
             "success": True,
 
             "inputText":
-                text,
+                mask_sensitive_text(text),
 
             "analysis":
                 result,
@@ -1821,13 +2412,11 @@ def analyze_message():
                 result["reasons"]
         })
 
-
     except Exception as error:
 
         logger.exception(
             "Message analysis error"
         )
-
 
         return jsonify({
 
@@ -1839,9 +2428,9 @@ def analyze_message():
         }), 500
 
 
-# =========================================================
-# TABULAR FRAUD PREDICTION
-# =========================================================
+# ============================================================
+# TRANSACTION PREDICTION API
+# ============================================================
 
 @app.post("/predict")
 @app.post("/api/predict")
@@ -1857,225 +2446,226 @@ def predict():
         )
 
 
-        amount = max(
-            0,
-            float(
-                data.get(
-                    "amount",
-                    0
-                )
-            )
+        # Calculate transaction risk
+        result = calculate_transaction_risk(
+            data
         )
 
 
-        new_device = normalize_bool(
+        # Generate transaction ID
+        transaction_id = str(
+
             data.get(
-                "newDevice",
-                False
+                "transactionId"
             )
+
+            or
+
+            uuid.uuid4()
         )
 
 
-        new_location = normalize_bool(
+        # Optional transaction reference
+        transaction_reference = clean_text(
+
             data.get(
-                "newLocation",
-                False
+                "transactionReference",
+                ""
             )
         )
 
 
-        rapid_txns = max(
-            0,
-            int(
-                data.get(
-                    "rapidTransactions",
-                    0
-                )
+        # Save privacy-preserving audit record
+        save_transaction_audit(
+
+            transaction_id=
+                transaction_id,
+
+            transaction_reference=
+                transaction_reference,
+
+            amount=
+                result["amount"],
+
+            risk_score=
+                result["riskScore"],
+
+            risk_level=
+                result["riskLevel"],
+
+            fraud_probability=
+                result["fraudProbability"],
+
+            user_action=
+                "RISK_CHECK",
+
+            user_confirmed=
+                0
+        )
+
+
+        # Create privacy audit
+        create_privacy_audit(
+
+            "TRANSACTION_RISK_ANALYZED",
+
+            transaction_id,
+
+            "Only masked transaction metadata was stored."
+        )
+
+
+        # Transaction warning decision
+        warning_required = (
+
+            result["riskScore"] >= 30
+        )
+
+
+        # Get understandable risk explanation
+        analysis = build_transaction_analysis(
+
+            risk_score=
+                result["riskScore"],
+
+            risk_level=
+                result["riskLevel"],
+
+            fraud_probability=
+                result["fraudProbability"]
+        )
+
+
+        # Confirmation requirement
+        confirmation = (
+
+            get_confirmation_requirement(
+
+                result["riskScore"]
             )
         )
 
 
-        failed_logins = max(
-            0,
-            int(
-                data.get(
-                    "failedLogins",
-                    0
-                )
+        # Masked metadata for institutional review
+        transaction_metadata = {
+
+            "amount":
+                result["amount"],
+
+            "newDevice":
+                result["newDevice"],
+
+            "newLocation":
+                result["newLocation"],
+
+            "rapidTransactions":
+                result["rapidTransactions"],
+
+            "failedLogins":
+                result["failedLogins"],
+
+            "otpRequests":
+                result["otpRequests"],
+
+            "transactionType":
+                "PAYMENT_BEHAVIOR_ANALYSIS"
+        }
+
+
+        # Queue suspicious cases for review
+        review_record = (
+
+            queue_review_if_required(
+
+                analysis=
+                    analysis,
+
+                source=
+                    "PAYMENT",
+
+                metadata=
+                    transaction_metadata
             )
         )
-
-
-        otp_requests = max(
-            0,
-            int(
-                data.get(
-                    "otpRequests",
-                    0
-                )
-            )
-        )
-
-
-        input_df = pd.DataFrame(
-
-            [[
-
-                amount,
-
-                new_device,
-
-                new_location,
-
-                rapid_txns,
-
-                failed_logins,
-
-                otp_requests
-
-            ]],
-
-            columns=FEATURES
-        )
-
-
-        # -------------------------------------------------
-        # Actual ML prediction
-        # -------------------------------------------------
-
-        if model is not None:
-
-            probabilities = (
-                model.predict_proba(
-                    input_df
-                )[0]
-            )
-
-
-            classes = list(
-                model.classes_
-            )
-
-
-            if 1 in classes:
-
-                fraud_index = (
-                    classes.index(1)
-                )
-
-            elif "1" in classes:
-
-                fraud_index = (
-                    classes.index("1")
-                )
-
-            else:
-
-                fraud_index = 1
-
-
-            fraud_probability = float(
-                probabilities[
-                    fraud_index
-                ]
-            )
-
-
-            risk_score = round(
-
-                clamp(
-                    fraud_probability * 100
-                ),
-
-                2
-            )
-
-
-        # -------------------------------------------------
-        # Fallback
-        # -------------------------------------------------
-
-        else:
-
-            risk_score = 3
-
-
-            if amount >= 100000:
-
-                risk_score += 25
-
-            elif amount >= 50000:
-
-                risk_score += 18
-
-            elif amount >= 15000:
-
-                risk_score += 10
-
-
-            if new_device:
-
-                risk_score += 18
-
-
-            if new_location:
-
-                risk_score += 15
-
-
-            if rapid_txns >= 5:
-
-                risk_score += 25
-
-            elif rapid_txns >= 3:
-
-                risk_score += 15
-
-
-            if failed_logins >= 5:
-
-                risk_score += 20
-
-            elif failed_logins >= 2:
-
-                risk_score += 10
-
-
-            if otp_requests >= 5:
-
-                risk_score += 20
-
-            elif otp_requests >= 3:
-
-                risk_score += 12
-
-
-            risk_score = round(
-                clamp(risk_score),
-                2
-            )
-
-
-            fraud_probability = round(
-                risk_score / 100,
-                4
-            )
 
 
         return jsonify({
 
-            "success": True,
+            "success":
+                True,
+
+
+            "transactionId":
+                transaction_id,
+
 
             "riskScore":
-                risk_score,
+                result["riskScore"],
+
 
             "riskLevel":
-                get_risk_level(
-                    risk_score
-                ),
+                result["riskLevel"],
+
 
             "fraudProbability":
-                fraud_probability
+                result["fraudProbability"],
+
+
+            "warningRequired":
+                warning_required,
+
+
+            "allowUserConfirmation":
+                True,
+
+
+            "automaticBlock":
+                False,
+
+
+            "analysis":
+                analysis,
+
+
+            "confirmation":
+                confirmation,
+
+
+            "reviewId":
+
+                review_record["reviewId"]
+
+                if review_record
+
+                else None,
+
+
+            "privacyNotice":
+
+                (
+                    "Only masked transaction metadata is stored "
+                    "for fraud review. Sensitive credentials, "
+                    "OTP, PIN, CVV and passwords are not stored."
+                ),
+
+
+            "message":
+
+                (
+                    "Risk analysis complete. The transaction "
+                    "has not been automatically blocked. "
+                    "Please review the warning and confirm "
+                    "if you want to continue."
+                )
+
+                if warning_required
+
+                else
+
+                (
+                    "No significant risk detected. "
+                    "Transaction can continue."
+                )
         })
 
 
@@ -2088,7 +2678,8 @@ def predict():
 
         return jsonify({
 
-            "success": False,
+            "success":
+                False,
 
             "message":
                 str(error)
@@ -2096,9 +2687,565 @@ def predict():
         }), 500
 
 
-# =========================================================
-# VOICE ANALYSIS
-# =========================================================
+# ============================================================
+# USER CONFIRMATION / PROCEED ANYWAY
+# ============================================================
+
+@app.post("/api/transaction/confirm")
+@app.post("/transaction/confirm")
+def confirm_transaction():
+
+    connection = None
+
+    try:
+
+        data = (
+            request.get_json(
+                silent=True
+            )
+            or {}
+        )
+
+        transaction_id = clean_text(
+            data.get(
+                "transactionId"
+            )
+        )
+
+        user_action = clean_text(
+            data.get(
+                "action",
+                "PROCEED"
+            )
+        ).upper()
+
+        if not transaction_id:
+
+            return jsonify({
+
+                "success": False,
+
+                "message":
+                    "transactionId is required."
+
+            }), 400
+
+        allowed_actions = [
+
+            "PROCEED",
+            "PROCEED_ANYWAY",
+            "CANCEL",
+            "DECLINE"
+        ]
+
+        if user_action not in allowed_actions:
+
+            return jsonify({
+
+                "success": False,
+
+                "message":
+                    "Invalid action."
+
+            }), 400
+
+        connection = get_db_connection()
+
+        transaction = connection.execute(
+            """
+            SELECT *
+            FROM transaction_audits
+            WHERE id = ?
+            """,
+            (transaction_id,)
+        ).fetchone()
+
+        if not transaction:
+
+            return jsonify({
+
+                "success": False,
+
+                "message":
+                    "Transaction risk record not found."
+
+            }), 404
+
+        user_confirmed = int(
+            user_action
+            in [
+                "PROCEED",
+                "PROCEED_ANYWAY"
+            ]
+        )
+
+        connection.execute(
+            """
+            UPDATE transaction_audits
+            SET
+                user_action = ?,
+                user_confirmed = ?
+            WHERE id = ?
+            """,
+            (
+                user_action,
+                user_confirmed,
+                transaction_id
+            )
+        )
+
+        connection.commit()
+
+        create_privacy_audit(
+            "USER_TRANSACTION_DECISION",
+            transaction_id,
+            f"User selected {user_action}."
+        )
+
+        if user_confirmed:
+
+            message = (
+                "User confirmation recorded. "
+                "Risk engine does not automatically block legitimate urgent payments."
+            )
+
+        else:
+
+            message = (
+                "Transaction cancellation/decline decision recorded."
+            )
+
+        return jsonify({
+
+            "success": True,
+
+            "transactionId":
+                transaction_id,
+
+            "userAction":
+                user_action,
+
+            "userConfirmed":
+                bool(user_confirmed),
+
+            "riskScore":
+                transaction["risk_score"],
+
+            "riskLevel":
+                transaction["risk_level"],
+
+            "message":
+                message
+        })
+
+    except Exception as error:
+
+        logger.exception(
+            "Transaction confirmation error"
+        )
+
+        return jsonify({
+
+            "success": False,
+
+            "message":
+                str(error)
+
+        }), 500
+
+    finally:
+
+        if connection:
+
+            connection.close()
+
+
+# ============================================================
+# FALSE POSITIVE REPORT
+# ============================================================
+
+@app.post("/api/reviews/false-positive")
+@app.post("/reviews/false-positive")
+def report_false_positive():
+
+    connection = None
+
+    try:
+
+        data = (
+            request.get_json(
+                silent=True
+            )
+            or {}
+        )
+
+        transaction_id = clean_text(
+            data.get(
+                "transactionId"
+            )
+        )
+
+        user_reason = sanitize_review_comment(
+            data.get(
+                "reason",
+                "User believes this was a legitimate transaction."
+            )
+        )
+
+        user_comment = sanitize_review_comment(
+            data.get(
+                "comment",
+                ""
+            )
+        )
+
+        if not transaction_id:
+
+            return jsonify({
+
+                "success": False,
+
+                "message":
+                    "transactionId is required."
+
+            }), 400
+
+        connection = get_db_connection()
+
+        transaction = connection.execute(
+            """
+            SELECT *
+            FROM transaction_audits
+            WHERE id = ?
+            """,
+            (transaction_id,)
+        ).fetchone()
+
+        if not transaction:
+
+            return jsonify({
+
+                "success": False,
+
+                "message":
+                    "Transaction not found."
+
+            }), 404
+
+        review_id = str(
+            uuid.uuid4()
+        )
+
+        connection.execute(
+            """
+            INSERT INTO false_positive_reviews (
+                id,
+                transaction_id,
+                risk_score,
+                risk_level,
+                user_reason,
+                user_comment,
+                status,
+                reviewer_comment,
+                reviewed_by,
+                created_at,
+                reviewed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                review_id,
+                transaction_id,
+                transaction["risk_score"],
+                transaction["risk_level"],
+                user_reason,
+                user_comment,
+                "PENDING",
+                "",
+                "",
+                now_utc(),
+                None
+            )
+        )
+
+        connection.commit()
+
+        create_privacy_audit(
+            "FALSE_POSITIVE_REPORTED",
+            review_id,
+            "Review stored without raw credentials."
+        )
+
+        return jsonify({
+
+            "success": True,
+
+            "reviewId":
+                review_id,
+
+            "transactionId":
+                transaction_id,
+
+            "status":
+                "PENDING",
+
+            "message":
+                "False-positive report submitted for institutional review."
+        })
+
+    except Exception as error:
+
+        logger.exception(
+            "False positive report error"
+        )
+
+        return jsonify({
+
+            "success": False,
+
+            "message":
+                str(error)
+
+        }), 500
+
+    finally:
+
+        if connection:
+
+            connection.close()
+
+
+# ============================================================
+# ADMIN / BANK REVIEW QUEUE
+# ============================================================
+
+@app.get("/api/admin/reviews")
+@app.get("/admin/reviews")
+def get_admin_reviews():
+
+    connection = None
+
+    try:
+
+        status = clean_text(
+            request.args.get(
+                "status",
+                ""
+            )
+        ).upper()
+
+        connection = get_db_connection()
+
+        if status in [
+            "PENDING",
+            "APPROVED",
+            "REJECTED"
+        ]:
+
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM false_positive_reviews
+                WHERE status = ?
+                ORDER BY created_at DESC
+                """,
+                (status,)
+            ).fetchall()
+
+        else:
+
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM false_positive_reviews
+                ORDER BY created_at DESC
+                """
+            ).fetchall()
+
+        reviews = [
+
+            dict(row)
+            for row
+            in rows
+        ]
+
+        return jsonify({
+
+            "success": True,
+
+            "count":
+                len(reviews),
+
+            "reviews":
+                reviews
+        })
+
+    except Exception as error:
+
+        logger.exception(
+            "Admin review fetch error"
+        )
+
+        return jsonify({
+
+            "success": False,
+
+            "message":
+                str(error)
+
+        }), 500
+
+    finally:
+
+        if connection:
+
+            connection.close()
+
+
+# ============================================================
+# ADMIN APPROVE / REJECT REVIEW
+# ============================================================
+
+@app.patch("/api/admin/reviews/<review_id>")
+@app.patch("/admin/reviews/<review_id>")
+def update_admin_review(review_id):
+
+    connection = None
+
+    try:
+
+        data = (
+            request.get_json(
+                silent=True
+            )
+            or {}
+        )
+
+        status = clean_text(
+            data.get(
+                "status"
+            )
+        ).upper()
+
+        reviewer = sanitize_review_comment(
+            data.get(
+                "reviewedBy",
+                "Institution Reviewer"
+            )
+        )
+
+        reviewer_comment = sanitize_review_comment(
+            data.get(
+                "reviewerComment",
+                ""
+            )
+        )
+
+        if status not in [
+            "APPROVED",
+            "REJECTED"
+        ]:
+
+            return jsonify({
+
+                "success": False,
+
+                "message":
+                    "Status must be APPROVED or REJECTED."
+
+            }), 400
+
+        connection = get_db_connection()
+
+        review = connection.execute(
+            """
+            SELECT *
+            FROM false_positive_reviews
+            WHERE id = ?
+            """,
+            (review_id,)
+        ).fetchone()
+
+        if not review:
+
+            return jsonify({
+
+                "success": False,
+
+                "message":
+                    "Review not found."
+
+            }), 404
+
+        connection.execute(
+            """
+            UPDATE false_positive_reviews
+            SET
+                status = ?,
+                reviewer_comment = ?,
+                reviewed_by = ?,
+                reviewed_at = ?
+            WHERE id = ?
+            """,
+            (
+                status,
+                reviewer_comment,
+                reviewer,
+                now_utc(),
+                review_id
+            )
+        )
+
+        connection.commit()
+
+        create_privacy_audit(
+            "REVIEW_DECISION",
+            review_id,
+            f"Institution review marked {status}."
+        )
+
+        return jsonify({
+
+            "success": True,
+
+            "reviewId":
+                review_id,
+
+            "status":
+                status,
+
+            "reviewedBy":
+                reviewer,
+
+            "message":
+                f"Review {status.lower()} successfully."
+        })
+
+    except Exception as error:
+
+        logger.exception(
+            "Admin review update error"
+        )
+
+        return jsonify({
+
+            "success": False,
+
+            "message":
+                str(error)
+
+        }), 500
+
+    finally:
+
+        if connection:
+
+            connection.close()
+
+
+# ============================================================
+# VOICE FRAUD ANALYSIS
+# ============================================================
 
 @app.post("/analyze-voice")
 @app.post("/api/voice/analyze")
@@ -2106,7 +3253,6 @@ def predict():
 def analyze_voice():
 
     temp_audio_file = None
-
 
     try:
 
@@ -2121,7 +3267,6 @@ def analyze_voice():
 
             }), 500
 
-
         audio_file = (
 
             request.files.get("audio")
@@ -2130,7 +3275,6 @@ def analyze_voice():
 
             request.files.get("file")
         )
-
 
         if not audio_file:
 
@@ -2143,11 +3287,9 @@ def analyze_voice():
 
             }), 400
 
-
         extension = os.path.splitext(
             audio_file.filename
         )[1].lower()
-
 
         allowed = {
 
@@ -2162,7 +3304,6 @@ def analyze_voice():
             ".mpga"
         }
 
-
         if extension not in allowed:
 
             return jsonify({
@@ -2173,7 +3314,6 @@ def analyze_voice():
                     "Unsupported audio format."
 
             }), 400
-
 
         with tempfile.NamedTemporaryFile(
 
@@ -2190,7 +3330,6 @@ def analyze_voice():
             audio_file.save(
                 temp_audio_file
             )
-
 
         with open(
             temp_audio_file,
@@ -2220,11 +3359,11 @@ def analyze_voice():
                     prompt=(
                         "Indian cyber fraud, OTP, PIN, CVV, "
                         "digital arrest, CBI, police, customs, "
-                        "KYC scam, bank fraud, AnyDesk, APK."
+                        "KYC scam, bank fraud, AnyDesk, APK, "
+                        "coercion, threats and urgency."
                     )
                 )
             )
-
 
         transcript = clean_text(
 
@@ -2234,7 +3373,6 @@ def analyze_voice():
                 ""
             )
         )
-
 
         if not transcript:
 
@@ -2255,18 +3393,24 @@ def analyze_voice():
                     ["Audio was unclear or silent."]
             })
 
-
         analysis = analyze_content(
             transcript
         )
 
+        create_privacy_audit(
+            "VOICE_ANALYZED",
+            str(uuid.uuid4()),
+            "Temporary voice file deleted after analysis."
+        )
 
         return jsonify({
 
             "success": True,
 
             "transcript":
-                transcript,
+                mask_sensitive_text(
+                    transcript
+                ),
 
             "analysis":
                 analysis,
@@ -2284,13 +3428,11 @@ def analyze_voice():
                 analysis["reasons"]
         })
 
-
     except Exception as error:
 
         logger.exception(
             "Voice analysis error"
         )
-
 
         return jsonify({
 
@@ -2300,7 +3442,6 @@ def analyze_voice():
                 str(error)
 
         }), 500
-
 
     finally:
 
@@ -2318,17 +3459,283 @@ def analyze_voice():
                     temp_audio_file
                 )
 
+                logger.info(
+                    "Temporary voice file deleted."
+                )
+
             except Exception:
 
                 pass
 
-
         gc.collect()
 
 
-# =========================================================
-# HOME
-# =========================================================
+        
+@app.get("/review/queue")
+@app.get("/api/review/queue")
+def get_review_queue():
+
+    try:
+
+        status_filter = clean_text(
+
+            request.args.get(
+                "status",
+                ""
+            )
+
+        ).upper()
+
+
+        priority_filter = clean_text(
+
+            request.args.get(
+                "priority",
+                ""
+            )
+
+        ).upper()
+
+
+        with review_lock:
+
+            records = list(
+                review_store.values()
+            )
+
+
+        if status_filter:
+
+            records = [
+
+                record
+
+                for record in records
+
+                if record.get(
+                    "status"
+                ) == status_filter
+            ]
+
+
+        if priority_filter:
+
+            records = [
+
+                record
+
+                for record in records
+
+                if record.get(
+                    "priority"
+                ) == priority_filter
+            ]
+
+
+        priority_order = {
+
+            "CRITICAL": 4,
+
+            "HIGH": 3,
+
+            "MEDIUM": 2,
+
+            "LOW": 1
+        }
+
+
+        records.sort(
+
+            key=lambda record: (
+
+                priority_order.get(
+                    record.get(
+                        "priority",
+                        "LOW"
+                    ),
+                    0
+                ),
+
+                record.get(
+                    "createdAt",
+                    ""
+                )
+            ),
+
+            reverse=True
+        )
+
+
+        return jsonify({
+
+            "success": True,
+
+            "total":
+                len(records),
+
+            "records":
+                records
+
+        })
+
+
+    except Exception as error:
+
+        logger.exception(
+            "Review queue error"
+        )
+
+
+        return jsonify({
+
+            "success": False,
+
+            "message":
+                str(error)
+
+        }), 500
+        
+# ============================================================
+# REVIEW RESOLUTION
+# ============================================================
+
+@app.post("/review/<review_id>/resolve")
+@app.post("/api/review/<review_id>/resolve")
+def resolve_review(review_id):
+
+    try:
+
+        data = (
+            request.get_json(
+                silent=True
+            )
+            or {}
+        )
+
+
+        decision = clean_text(
+
+            data.get(
+                "decision",
+                ""
+            )
+
+        ).upper()
+
+
+        reviewer_note = clean_text(
+
+            data.get(
+                "note",
+                ""
+            )
+
+        )[:1000]
+
+
+        allowed_decisions = [
+
+            "CONFIRMED_FRAUD",
+
+            "FALSE_POSITIVE",
+
+            "LEGITIMATE",
+
+            "ESCALATED"
+        ]
+
+
+        if decision not in allowed_decisions:
+
+            return jsonify({
+
+                "success": False,
+
+                "message":
+                    (
+                        "Invalid decision. Use CONFIRMED_FRAUD, "
+                        "FALSE_POSITIVE, LEGITIMATE or ESCALATED."
+                    )
+            }), 400
+
+
+        with review_lock:
+
+            record = review_store.get(
+                review_id
+            )
+
+
+            if not record:
+
+                return jsonify({
+
+                    "success": False,
+
+                    "message":
+                        "Review record not found."
+
+                }), 404
+
+
+            if decision == "ESCALATED":
+
+                record["status"] = "ESCALATED"
+
+            else:
+
+                record["status"] = "RESOLVED"
+
+                record["resolvedAt"] = utc_now()
+
+
+            record["reviewDecision"] = (
+                decision
+            )
+
+            record["reviewerNote"] = (
+                reviewer_note
+            )
+
+            record["updatedAt"] = utc_now()
+
+
+        return jsonify({
+
+            "success": True,
+
+            "reviewId":
+                review_id,
+
+            "status":
+                record["status"],
+
+            "decision":
+                decision,
+
+            "message":
+                "Review decision recorded successfully."
+        })
+
+
+    except Exception as error:
+
+        logger.exception(
+            "Review resolution error"
+        )
+
+
+        return jsonify({
+
+            "success": False,
+
+            "message":
+                str(error)
+
+        }), 500
+# ============================================================
+# SERVICE STATUS
+# ============================================================
 
 @app.get("/")
 def home():
@@ -2359,14 +3766,29 @@ def home():
             if model is not None
             else "HEURISTIC",
 
+        "privacy_mode":
+            "SENSITIVE DATA MINIMIZATION ACTIVE",
+
+        "transaction_confirmation":
+            "ACTIVE",
+
+        "false_positive_review":
+            "ACTIVE",
+
+        "institution_review_queue":
+            "ACTIVE",
+
+        "automatic_transaction_block":
+            False,
+
         "port":
             8000
     })
 
 
-# =========================================================
-# RUN SERVER
-# =========================================================
+# ============================================================
+# RUN APPLICATION
+# ============================================================
 
 if __name__ == "__main__":
 
@@ -2377,8 +3799,7 @@ if __name__ == "__main__":
         )
     )
 
-
-    print("\n" + "=" * 55)
+    print("\n" + "=" * 60)
 
     print(
         "DhanRakshak Fraud Intelligence Engine"
@@ -2400,8 +3821,19 @@ if __name__ == "__main__":
         f"ML Model: {'LOADED' if model else 'HEURISTIC'}"
     )
 
-    print("=" * 55 + "\n")
+    print(
+        "Privacy Protection: ACTIVE"
+    )
 
+    print(
+        "User Confirmation: ACTIVE"
+    )
+
+    print(
+        "False Positive Review: ACTIVE"
+    )
+
+    print("=" * 60 + "\n")
 
     app.run(
 
