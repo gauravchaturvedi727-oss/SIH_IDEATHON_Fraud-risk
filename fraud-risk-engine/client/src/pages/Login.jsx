@@ -119,7 +119,7 @@ function Login() {
 
                         <span>🛡️</span>
 
-                        FraudGuard
+                        DhanRakshak
 
                     </div>
 
@@ -242,7 +242,7 @@ function Login() {
 
 
                         <h2>
-                            Sign in to FraudGuard
+                            Sign in to DhanRakshak
                         </h2>
 
 
