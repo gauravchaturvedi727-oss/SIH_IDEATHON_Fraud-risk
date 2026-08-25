@@ -887,3 +887,37 @@ form {
     font-size: 1.65rem;
   }
 }
+
+
+.password-input {
+    position: relative;
+}
+
+.password-input input {
+    padding-right: 50px;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    border: none;
+    background: transparent;
+
+    cursor: pointer;
+
+    font-size: 17px;
+    padding: 4px;
+}
+
+.password-hint {
+    display: block;
+    margin-top: 7px;
+
+    font-size: 11px;
+    line-height: 1.4;
+
+    color: #8d99ae;
+}
